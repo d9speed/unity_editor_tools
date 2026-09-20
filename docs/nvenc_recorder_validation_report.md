@@ -49,4 +49,10 @@ Unityを`-batchmode -force-d3d11 -executeMethod D9speed.PackageValidation.nvenc_
 
 Standalone Player、IL2CPP、Unity 6、URP/HDRP、他GPU、長時間録画、Playモードのウィンドウ操作全体は今回の検証対象外です。Runtimeを同梱しますが、VRChatへアップロードしたアバターでこの録画処理が動くことを意味しません。
 
-Screen Texture Captureは公開用ソース・VPM一覧・案内ページから削除し、本パッケージを追加します。既に導入済みのScreen Texture Captureや旧Assets版録画ツールを自動削除する処理はありません。
+Screen Texture Captureは公開用ソース・VPM一覧・案内ページから削除し、本パッケージを追加しました。既に導入済みのScreen Texture Captureや旧Assets版録画ツールを自動削除する処理はありません。
+
+## 公開後の導入確認
+
+GitHub Releasesから認証なしでZIPを取得し、検証したZIPとのSHA-256一致を確認しました。公開済みの`index.json`と案内ページに本パッケージが表示され、Screen Texture Captureが一覧に含まれないことも確認しています。
+
+分離したVPM検証プロジェクトへ、公開リポジトリを使ってvrc-get 1.9.2で0.1.0をインストールできました。導入された43ファイルすべてが公開ZIPの内容とバイト単位で一致しています。今回のVPM確認はコマンドラインからの導入で、VCC/ALCOM画面そのものの操作確認ではありません。
