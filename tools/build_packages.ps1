@@ -31,18 +31,25 @@ foreach ($directory in $package_directories) {
     if ($selected -and (Test-Path -LiteralPath $zip_path)) { throw "ZIP already exists: $zip_path" }
     $files = @(Get-ChildItem -LiteralPath $directory.FullName -Recurse -File)
     foreach ($file in $files) {
+        if ($file.Extension -eq '.pyc') { throw "Python cache must not be packaged: $($file.FullName)" }
         if ($file.Extension -eq '.meta') {
             $match = [regex]::Match((Get-Content -LiteralPath $file.FullName -Raw), '(?m)^guid: ([0-9a-f]{32})\s*$')
             if (-not $match.Success) { throw "Missing GUID: $($file.FullName)" }
             $guid = $match.Groups[1].Value
             if ($guid_paths.ContainsKey($guid)) { throw "Duplicate GUID: $($file.FullName)" }
             $guid_paths[$guid] = $file.FullName
-        } elseif (-not (Test-Path -LiteralPath ($file.FullName + '.meta'))) {
+        } elseif ($file.FullName -notmatch '[\\/][^\\/]+~[\\/]' -and -not (Test-Path -LiteralPath ($file.FullName + '.meta'))) {
             throw "Missing .meta: $($file.FullName)"
         }
     }
     foreach ($definition in ($files | Where-Object Extension -eq '.asmdef')) {
         $assembly = Get-Content -LiteralPath $definition.FullName -Raw | ConvertFrom-Json
+        if ($manifest.name -ceq 'io.github.d9speed.unity_blender_pose_sync' -and
+            $definition.FullName -ceq (Join-Path $directory.FullName 'Runtime\D9speed.PoseSync.Runtime.asmdef')) {
+            if ($assembly.name -cne 'D9speed.PoseSync.Runtime' -or @($assembly.references).Count -ne 0 -or
+                @($assembly.includePlatforms).Count -ne 0) { throw 'Unexpected Pose Sync Runtime assembly configuration' }
+            continue
+        }
         if (@($assembly.includePlatforms).Count -ne 1 -or $assembly.includePlatforms[0] -ne 'Editor') {
             throw "Assembly is not Editor-only: $($definition.Name)"
         }

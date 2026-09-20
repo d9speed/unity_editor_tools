@@ -1,0 +1,10 @@
+{
+  "name": "D9speed.PoseSync.Editor",
+  "references": [
+    "D9speed.PoseSync.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}

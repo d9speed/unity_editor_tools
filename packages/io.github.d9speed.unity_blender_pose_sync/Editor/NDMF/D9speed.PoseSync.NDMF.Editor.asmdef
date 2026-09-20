@@ -1,0 +1,21 @@
+{
+  "name": "D9speed.PoseSync.NDMF.Editor",
+  "references": [
+    "D9speed.PoseSync.Runtime",
+    "nadena.dev.ndmf"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "D9SPEED_POSESYNC_NDMF"
+  ],
+  "versionDefines": [
+    {
+      "name": "nadena.dev.ndmf",
+      "expression": "[1.11.0,2.0.0)",
+      "define": "D9SPEED_POSESYNC_NDMF"
+    }
+  ]
+}
