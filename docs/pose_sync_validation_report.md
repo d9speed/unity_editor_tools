@@ -42,6 +42,12 @@ IL2CPP、WebGL、モバイル、macOS / Linux、Unity 6、個々の実アバタ�
 
 VCC / ALCOMの画面操作による導入確認は、今回の自動確認には含みません。
 
+## 公開配布の確認
+
+GitHub Releasesの0.1.0 ZIPを認証なしで取得し、公開VPM一覧のSHA-256と一致することを確認しました。既存の10パッケージと過去バージョンは維持しています。
+
+通常のALCOM設定から分離したvrc-get 1.9.2で、[公開リポジトリ](https://d9speed.github.io/Unity_Tools/index.json)から本パッケージを導入しました。Runtime・Editor・Blenderアドオンを含む36ファイルが配布元と一致し、MessagePackやNuGet等の追加パッケージを要求しないことを確認しました。
+
 ## 仕様の参照先
 
 - [UnityのRuntime / Editorアセンブリ分割](https://docs.unity3d.com/2022.3/Documentation/Manual/cus-asmdef.html)
