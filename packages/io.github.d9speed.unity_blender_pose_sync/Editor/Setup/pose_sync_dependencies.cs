@@ -56,6 +56,20 @@ namespace UnityBlenderPoseSync.Setup
 
         private static string PackageVersion(string id) =>
             UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages().FirstOrDefault(p => p.name == id)?.version ?? "";
+
+        // The setup action includes upgrading older stable patches of the supported
+        // minor version. Never silently downgrade a newer release or replace another major/minor.
+        public static void ValidateMessagePackUpgrade(string id, string existing)
+        {
+            if (string.IsNullOrEmpty(existing) || existing == MessagePackVersion) return;
+            var target = Version.Parse(MessagePackVersion);
+            if (Version.TryParse(existing, out var current) && current.Major == target.Major
+                && current.Minor == target.Minor && current.Build >= 0 && current.Revision < 0
+                && current < target) return;
+            throw new InvalidOperationException(id + " " + existing + " が導入済みです。セットアップで更新できるのは "
+                + target.Major + "." + target.Minor + ".x の旧版です。既存ツールとの対応を確認して "
+                + MessagePackVersion + " へ揃えてください。新しい版のダウングレードは行いません。");
+        }
         private static bool InvokeBool(string method)
         {
             try { return Bridge?.GetMethod(method)?.Invoke(null, null) is bool value && value; }
@@ -108,6 +122,7 @@ namespace UnityBlenderPoseSync.Setup
                         RequestUpm(NuGetUrl);
                         break;
                     case Step.InstallingMessagePack:
+                        ValidateMessagePackUpgrade("MessagePack.Unity", PackageVersion(UnitySupportId));
                         if (HasCore && InvokeBool("AnalyzerReady")) { SetStep(Step.InstallingMessagePackUnity); return; }
                         if (SessionState.GetBool(Key+"Requested",false)) return;
                         SessionState.SetBool(Key+"Requested",true);
@@ -120,7 +135,7 @@ namespace UnityBlenderPoseSync.Setup
                     case Step.InstallingMessagePackUnity:
                         if (HasUnitySupport) { SetStep(Step.Compiling); return; }
                         var existing = PackageVersion(UnitySupportId);
-                        if (existing.Length > 0) { Fail("MessagePack.Unity " + existing + " が導入済みです。3.1.9へ揃えて再試行してください。既存版は変更していません。"); return; }
+                        ValidateMessagePackUpgrade("MessagePack.Unity", existing);
                         RequestUpm(UnitySupportUrl);
                         break;
                     case Step.Compiling:

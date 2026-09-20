@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 — 2026-09-21
+
+- Manager・Snapshot・Setupのメニューをすべて`D9speed/Animations`へ統一。
+- 既存のMessagePack 3.1.7などでセットアップが停止する問題を修正。3.1.xの旧パッチ版は3.1.9へ更新し、Annotations・Analyzer・Unity Supportも揃えます。
+- 手動導入済みの関連NuGetパッケージも更新対象に含め、元の手動導入フラグを保持。
+- 新しい版のダウングレードや別のメジャー・マイナー版の置き換えは行いません。
+- 完了時の緑チェック・進捗ボックスを継承。
+
 ## 0.1.1 - 2026-09-20
 
 - 独自MessagePack実装を公式NuGet版3.1.9へ置き換え、Source Generatorで通信DTOを処理。

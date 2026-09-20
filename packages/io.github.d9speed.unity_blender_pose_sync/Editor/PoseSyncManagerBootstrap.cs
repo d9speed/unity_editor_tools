@@ -613,7 +613,7 @@ namespace UnityBlenderPoseSync.World.Editor
             {
                 Debug.LogWarning(
                     $"Pose Sync Manager: {unresolved} avatar(s) could not be resolved in this scene. " +
-                    "Re-pick them in D9speed/Animation/Pose Sync Manager.");
+                    "Re-pick them in D9speed/Animations/Pose Sync Manager.");
             }
 
             // Garments merged in by Modular Avatar: their bones now live under the
@@ -703,7 +703,7 @@ namespace UnityBlenderPoseSync.World.Editor
                 Debug.LogError(
                     "Pose Sync Manager: Blender側の名前が重複しています: " +
                     string.Join(", ", duplicate_names) +
-                    ". D9speed/Animation/Pose Sync Manager で一意の名前に変更してください。送信は開始しません。");
+                    ". D9speed/Animations/Pose Sync Manager で一意の名前に変更してください。送信は開始しません。");
                 return null;
             }
 

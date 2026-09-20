@@ -14,7 +14,7 @@ using UnityEngine.UIElements;
 
 public class AnimatorPlaybackPreviewWindow : EditorWindow
 {
-    private const string menu_path = "D9speed/Animation/Animator Playback Preview";
+    private const string menu_path = "D9speed/Animations/Animator Playback Preview";
     private const string no_search_folder_label = "None";
     private const string registered_folder_session_key = "D9speed.AnimatorPlaybackPreview.RegisteredFolders";
 

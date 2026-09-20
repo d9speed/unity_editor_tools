@@ -32,17 +32,24 @@ namespace UnityBlenderPoseSync.Setup
 
         public static bool Install()
         {
-            // NuGetForUnity resolves the transitive dependencies using the project's
-            // API compatibility level. Do not maintain a hand-written dependency list.
-            foreach (var id in new [] { "MessagePack", "MessagePack.Annotations", "MessagePackAnalyzer" })
+            // Preflight the complete family before changing anything. Explicitly
+            // update each member because NuGet preserves manually installed dependencies.
+            var ids = new [] { "MessagePack.Annotations", "MessagePackAnalyzer", "MessagePack" };
+            foreach (var id in ids)
+                PoseSyncDependencies.ValidateMessagePackUpgrade(id, VersionOf(id));
+
+            foreach (var id in ids)
             {
-                var existing = VersionOf(id);
-                if (existing.Length > 0 && existing != PoseSyncDependencies.MessagePackVersion)
-                    throw new InvalidOperationException(id + " " + existing + " が導入済みです。NuGet画面で "
-                        + PoseSyncDependencies.MessagePackVersion + " へ揃えてから再試行してください。既存版は変更していません。");
+                var existing = InstalledPackagesManager.InstalledPackages.FirstOrDefault(package => package.Id == id);
+                if (existing?.Version == PoseSyncDependencies.MessagePackVersion) continue;
+                var identifier = new NugetPackageIdentifier(id, PoseSyncDependencies.MessagePackVersion)
+                { IsManuallyInstalled = id == "MessagePack" || existing?.IsManuallyInstalled == true };
+                if (!NugetPackageInstaller.InstallIdentifier(identifier, refreshAssets: false,
+                    isSlimRestoreInstall: false, allowUpdateForExplicitlyInstalled: true)) return false;
             }
-            return NugetPackageInstaller.InstallIdentifier(new NugetPackageIdentifier("MessagePack", PoseSyncDependencies.MessagePackVersion)
-            { IsManuallyInstalled = true }, refreshAssets: false, isSlimRestoreInstall: false, allowUpdateForExplicitlyInstalled: false);
+            // Remaining dependencies are resolved by NuGetForUnity for the project's
+            // API compatibility level, without a hand-written transitive dependency list.
+            return CoreInstalled();
         }
     }
 }

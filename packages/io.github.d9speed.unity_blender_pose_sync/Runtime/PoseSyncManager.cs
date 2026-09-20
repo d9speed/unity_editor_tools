@@ -12,7 +12,7 @@ namespace UnityBlenderPoseSync.World
     ///
     /// Avatars are named directly by their Animator - nothing has to be attached to
     /// the avatars themselves. In the normal workflow this component is not authored
-    /// into the scene at all: the Pose Sync Manager window (D9speed/Animation) spawns
+    /// into the scene at all: the Pose Sync Manager window (D9speed/Animations) spawns
     /// a throwaway GameObject carrying it when Play Mode starts.
     ///
     /// One connection matters because the receiver services a single client at a

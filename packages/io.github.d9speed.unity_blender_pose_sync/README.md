@@ -8,7 +8,7 @@ UnityのポーズとカメラをBlenderへ送るツールです。Humanoid、任
 2. Unityで`D9speed / Animations / PoseSync Setup`を開き、「セットアップ」を押します。依存パッケージの導入とコンパイルが終わると、チェックと進捗ボックスが緑になります。
 3. 「Blender用アドオンの場所を開く」を押し、表示された`blender_pose_receiver_world.py`をBlenderのプリファレンス → アドオン →「ディスクからインストール」で選び、有効化します。
 4. Blenderの3D Viewサイドバー → Pose Syncで対象Armatureを選び、`Start Pose Receiver (World)`を押します。
-5. Unityの`D9speed / Animation / Pose Sync Manager`でAnimatorを追加し、Play Modeを開始します。
+5. Unityの`D9speed / Animations / Pose Sync Manager`でAnimatorを追加し、Play Modeを開始します。
 
 Unity 2022.3.22f1以降、Blender 4.5以降向けです。セットアップにはインターネット接続とGitが必要です。NuGetForUnity 4.5.0、公式NuGet版MessagePack 3.1.9（Annotations・Analyzerと推移的依存を含む）、MessagePack.Unity 3.1.9を導入します。DLLはVPMパッケージに同梱せず、公式配布元から取得します。Blender側のPython msgpackは任意です。
 
@@ -30,7 +30,7 @@ Runtimeは通常のUnityプレイヤーからも参照できます。明示的�
 
 ## Snapshot・カメラ・衣装
 
-`D9speed / Animation / Send Pose Snapshot to Blender`では、Play Modeに入らず1フレームを送れます。AnimationウィンドウのPreviewを停止して使用してください。
+`D9speed / Animations / Send Pose Snapshot to Blender`では、Play Modeに入らず1フレームを送れます。AnimationウィンドウのPreviewを停止して使用してください。
 
 Managerのカメラ同期はCamera Object / Scene Viewに対応します。Blender側ではCamera Objectと3D Viewへの適用を選択できます。
 
@@ -42,7 +42,7 @@ Modular Avatarで統合する衣装は、PhysBone設定オブジェクトを含�
 
 旧版のEditor / Runtimeと本パッケージを同時に入れないでください。型とGUIDが重複します。バックアップ後、Unityを閉じて旧UnityBlenderPoseSyncのEditorとRuntimeをプロジェクト外へ退避し、VPM版を導入します。ツールの`.meta` GUIDは維持しています。元ファイルの自動削除は行いません。
 
-他のツールが使っているMessagePackやNuGetForUnityを削除する必要はありません。MessagePack本体・Annotations・Analyzer・Unity Supportに異なる版がある場合は、既存版を自動変更せず案内を表示します。他ツールの対応状況を確認し、3.1.9へ揃えて再試行してください。NuGetForUnityは4.5系に対応します。VPM 0.1.0から更新した場合もSetupを実行してください。プロジェクト別のManager設定は継続して参照しますが、古い全プロジェクト共通設定は自動取り込みしません。
+他のツールが使っているMessagePackやNuGetForUnityを削除する必要はありません。**「セットアップ／再試行」を押すと、MessagePack 3.1.xの旧パッチ版（3.1.7など）を3.1.9へ更新します。** 本体・Annotations・Analyzer・Unity Supportを揃え、手動導入済みの関連NuGetパッケージも更新します。3.1.9より新しい版や別のメジャー・マイナー版は自動変更せず案内を表示します。NuGetForUnityは4.5系に対応します。VPM 0.1.0から更新した場合もSetupを実行してください。プロジェクト別のManager設定は継続して参照しますが、古い全プロジェクト共通設定は自動取り込みしません。
 
 ## 通信互換性と制限
 

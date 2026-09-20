@@ -18,7 +18,7 @@ namespace UnityBlenderPoseSync.World.Editor
     /// </summary>
     public sealed class PoseSyncManagerWindow : EditorWindow
     {
-        private const string MenuPath = "D9speed/Animation/Pose Sync Manager";
+        private const string MenuPath = "D9speed/Animations/Pose Sync Manager";
 
         private PoseSyncSettings settings;
         private VisualElement avatar_list;

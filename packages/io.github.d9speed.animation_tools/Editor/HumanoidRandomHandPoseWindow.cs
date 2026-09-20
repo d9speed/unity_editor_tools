@@ -419,7 +419,7 @@ namespace D9speed.HumanoidRandomHandPose.Editor
 
     public sealed class HumanoidRandomHandPoseWindow : EditorWindow
     {
-        private const string MenuPath = "D9speed/Animation/Random Hand Muscle Generator";
+        private const string MenuPath = "D9speed/Animations/Random Hand Muscle Generator";
 
         [SerializeField] private Animator target_animator;
         [SerializeField] private string target_animator_id = "";

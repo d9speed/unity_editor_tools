@@ -22,13 +22,14 @@ namespace D9speed.PackageValidation
             {
                 var packages = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages();
                 foreach (var suffix in new[] { "animation_tools", "skinned_mesh_tools", "prefab_color_variants" })
-                    require(packages.Any(p => p.name == "io.github.d9speed." + suffix && p.version == "0.1.0"), suffix);
+                    require(packages.Any(p => p.name == "io.github.d9speed." + suffix
+                        && p.version == (suffix == "animation_tools" ? "0.1.1" : "0.1.0")), suffix);
                 require(!CompilationPipeline.GetAssemblies(AssembliesType.Player).Any(a => a.name.StartsWith("D9speed.")), "Editor-only assemblies");
             });
             check("Animation and color variant menus open", () =>
             {
-                open<AnimatorPlaybackPreviewWindow>("D9speed/Animation/Animator Playback Preview");
-                open<HumanoidRandomHandPoseWindow>("D9speed/Animation/Random Hand Muscle Generator");
+                open<AnimatorPlaybackPreviewWindow>("D9speed/Animations/Animator Playback Preview");
+                open<HumanoidRandomHandPoseWindow>("D9speed/Animations/Random Hand Muscle Generator");
                 open<PrefabColorVariantMaker>("D9speed/Tools/PrefabColorVariantMaker");
             });
             check("Hand pose API changes fingers and restores a generated humanoid", () =>

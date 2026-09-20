@@ -30,6 +30,8 @@ Cloth Fitting ToolsにはVRChat Avatars SDK 3.10.3以上・3.11.0未満が必要
 
 Unity Blender Pose SyncはRuntimeとEditorを1パッケージで導入できます。Unityの`D9speed / Animations / PoseSync Setup`で「セットアップ」を押すと、NuGetForUnityと公式MessagePackを導入し、完了項目を緑のチェックで表示します。同じ画面からBlender用アドオンの場所を開き、Blender側へインストールしてください。詳細は[使い方](packages/io.github.d9speed.unity_blender_pose_sync/README.md)と[検証記録](docs/pose_sync_nuget_validation_report.md)を参照してください。
 
+Animation Tools 0.1.1 / Pose Sync 0.1.2以降は、アニメーション系メニューを`D9speed / Animations`へ統一しています。Pose Syncのセットアップは、既存のMessagePack 3.1.7などから3.1.9への更新にも対応します。[更新検証](docs/pose_sync_upgrade_validation_report.md)を参照してください。
+
 Unity 2022.3.22f1で検証しています。旧Assets版と同時に入れるとGUIDやアセンブリが重複するため、新規プロジェクトでの導入を推奨します。旧ファイルの自動削除は行いません。
 
 ## 作業フォルダ

@@ -38,7 +38,7 @@ namespace UnityBlenderPoseSync.Setup
             var title = new Label("Unity Blender Pose Sync のセットアップ");
             title.style.fontSize = 15; title.style.unityFontStyleAndWeight = FontStyle.Bold;
             root.Add(title);
-            var subtitle = new Label("同期に必要な依存パッケージをインストールします。");
+            var subtitle = new Label("同期に必要な依存パッケージを導入・更新します。");
             subtitle.style.opacity = .7f; subtitle.style.marginBottom = 12;
             root.Add(subtitle);
             step_strip = new VisualElement { name = "setup_steps", style = { flexDirection = FlexDirection.Row, marginBottom = 16 } };
@@ -59,7 +59,7 @@ namespace UnityBlenderPoseSync.Setup
             buttons.Add(later); root.Add(buttons);
             var blender = new Button(() => EditorUtility.RevealInFinder(ReceiverPath)) { text = "Blender用アドオンの場所を開く" };
             blender.style.marginTop = 12; blender.SetEnabled(File.Exists(ReceiverPath)); root.Add(blender);
-            manager_button = new Button(() => EditorApplication.ExecuteMenuItem("D9speed/Animation/Pose Sync Manager")) { text = "Pose Sync Managerを開く" };
+            manager_button = new Button(() => EditorApplication.ExecuteMenuItem("D9speed/Animations/Pose Sync Manager")) { text = "Pose Sync Managerを開く" };
             root.Add(manager_button);
             Refresh();
         }
@@ -86,7 +86,7 @@ namespace UnityBlenderPoseSync.Setup
             message_label.style.color = error.Length > 0 ? new StyleColor(new Color(1f,.5f,.35f)) : new StyleColor(StyleKeyword.Null);
             message_label.text = error.Length > 0 ? error : ready ? "すべての依存パッケージが揃いました。Pose Sync Managerから利用できます。"
                 : busy ? "依存パッケージを準備しています。コンパイル後も自動で続行します。"
-                : "「セットアップ」を押すと、不足しているパッケージを順に導入します。";
+                : "「セットアップ」を押すと、不足パッケージを導入し、MessagePack 3.1.xの旧版を3.1.9へ更新します。";
             action_button.SetEnabled(!busy);
             action_button.text = ready ? "閉じる" : busy ? "インストール中…" : error.Length > 0 ? "再試行" : "セットアップ";
             manager_button.SetEnabled(ready);

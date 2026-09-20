@@ -12,7 +12,7 @@ namespace UnityBlenderPoseSync.World.Editor
 {
     public sealed class PoseSnapshotSenderWindow : EditorWindow
     {
-        private const string MenuPath = "D9speed/Animation/Send Pose Snapshot to Blender";
+        private const string MenuPath = "D9speed/Animations/Send Pose Snapshot to Blender";
         private const string HostPref = "D9speed.PoseSnapshot.Host";
         private const string PortPref = "D9speed.PoseSnapshot.Port";
 

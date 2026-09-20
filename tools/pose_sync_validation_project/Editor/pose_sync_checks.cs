@@ -41,7 +41,7 @@ namespace D9speed.PackageValidation
             check("All three menus open and bundled Blender receiver resolves", () => {
                 Require(EditorApplication.ExecuteMenuItem("D9speed/Animations/PoseSync Setup"), "PoseSync Setup");
                 foreach (var menu in new [] { "Pose Sync Manager", "Send Pose Snapshot to Blender" })
-                    Require(EditorApplication.ExecuteMenuItem("D9speed/Animation/" + menu), menu);
+                    Require(EditorApplication.ExecuteMenuItem("D9speed/Animations/" + menu), menu);
                 Require(File.Exists(PoseSyncSetupWindow.ReceiverPath), "Receiver missing");
                 foreach (var window in Resources.FindObjectsOfTypeAll<EditorWindow>().Where(w => w.GetType().Namespace?.StartsWith("UnityBlenderPoseSync") == true)) window.Close();
             });

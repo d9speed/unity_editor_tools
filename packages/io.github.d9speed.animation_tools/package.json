@@ -1,7 +1,7 @@
 {
   "name": "io.github.d9speed.animation_tools",
   "displayName": "D9speed Animation Tools",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "description": "Animator playback preview and random humanoid hand poses for the Unity Editor.",
@@ -13,7 +13,7 @@
   "license": "MIT",
   "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.animation_tools",
   "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.animation_tools/CHANGELOG.md",
-  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/animation_tools_v0.1.0/io.github.d9speed.animation_tools-0.1.0.zip",
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/animation_tools_v0.1.1/io.github.d9speed.animation_tools-0.1.1.zip",
   "vpmDependencies": {
     "io.github.d9speed.editor_core": ">=0.1.1 <0.2.0"
   }

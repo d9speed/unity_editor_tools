@@ -1,7 +1,7 @@
 {
   "name": "io.github.d9speed.unity_blender_pose_sync",
   "displayName": "D9speed Unity Blender Pose Sync",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "description": "Live pose and camera sync from Unity to Blender, including Runtime and the Blender receiver.",
@@ -13,5 +13,5 @@
   "license": "MIT",
   "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.unity_blender_pose_sync",
   "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.unity_blender_pose_sync/CHANGELOG.md",
-  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/unity_blender_pose_sync_v0.1.1/io.github.d9speed.unity_blender_pose_sync-0.1.1.zip"
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/unity_blender_pose_sync_v0.1.2/io.github.d9speed.unity_blender_pose_sync-0.1.2.zip"
 }
