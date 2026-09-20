@@ -1,5 +1,7 @@
 # 追加5パッケージの検証記録
 
+追記（2026-09-21）: Screen Texture Captureは公開対象から削除しました。録画ツールは別パッケージの[NVENC GPU Recorder](nvenc_recorder_validation_report.md)として公開します。以下のScreen Texture Captureの記録は廃止前の内容です。
+
 2026-09-20、Windows上のUnity 2022.3.22f1で確認しました。
 
 追記（2026-09-21）: Cloth Fitting Tools 0.1.1でProxVRCphysboneSettingsを廃止しました。Unity 2022.3.22f1 / SDK 3.10.5で、依存パッケージとの共存とEditor分離、コライダー生成メニュー、合成メッシュからの生成とUndoの3項目を再確認しています。以下の初版の記録は0.1.0当時の内容です。

@@ -1,0 +1,7 @@
+{
+  "name": "D9speed.NvencGpu.Editor",
+  "rootNamespace": "D9speed.NvencGpu.Editor",
+  "references": ["D9speed.NvencGpu.Runtime"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

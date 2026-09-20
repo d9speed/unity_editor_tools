@@ -14,17 +14,19 @@ Unity Editor拡張を、機能ごとのVPMパッケージとして管理しま�
 | `io.github.d9speed.animation_tools` | Animator再生プレビュー、手指のランダムポーズ |
 | `io.github.d9speed.skinned_mesh_tools` | SkinnedMeshRendererのInspector拡張 |
 | `io.github.d9speed.prefab_color_variants` | マテリアルを置き換えたPrefab Variantの作成 |
-| `io.github.d9speed.screen_texture_capture` | Windows画面範囲をライブTextureへ取得。FFmpegは別途指定 |
+| `io.github.d9speed.nvenc_gpu_recorder` | カメラ・RenderTextureのHEVC/MP4、透過ProRes/MOV・PNG録画。FFmpegは別途指定 |
 | `io.github.d9speed.cloth_fitting_tools` | PhysBoneコライダー生成 |
 | `io.github.d9speed.unity_blender_pose_sync` | UnityからBlenderへのポーズ・カメラ同期。RuntimeとBlenderアドオンを同梱 |
 
 ## 導入
 
-[案内ページ](https://d9speed.github.io/Unity_Tools/)からVCC/ALCOMにリポジトリを追加し、プロジェクト管理画面で使いたいツールを導入してください。Editor Coreも依存パッケージとして導入されます。Package ExporterではUnity公式のNewtonsoft Json 3.2.1もUnity Package Manager経由で取得します。
+[案内ページ](https://d9speed.github.io/Unity_Tools/)からVCC/ALCOMにリポジトリを追加し、プロジェクト管理画面で使いたいツールを導入してください。Editor Coreを必要とするツールでは、依存パッケージとして自動導入されます。Package ExporterではUnity公式のNewtonsoft Json 3.2.1もUnity Package Manager経由で取得します。
 
 登録用URL: `https://d9speed.github.io/Unity_Tools/index.json`
 
-Screen Texture CaptureはWindows Editor専用で、FFmpeg実行ファイルは同梱しません。Cloth Fitting ToolsにはVRChat Avatars SDK 3.10.3以上・3.11.0未満が必要です。SDKは公式リポジトリから依存として導入されます。
+NVENC GPU RecorderはWindows x64向けです。HEVC録画はNVIDIA / Direct3D 11が必要で、透過ProResにも対応します。FFmpeg実行ファイルは同梱しません。詳細は[録画ツールの使い方](packages/io.github.d9speed.nvenc_gpu_recorder/README.md)を参照してください。Screen Texture Captureは公開対象から削除しました。既に導入済みの場合はVCC/ALCOMから個別に削除してください。
+
+Cloth Fitting ToolsにはVRChat Avatars SDK 3.10.3以上・3.11.0未満が必要です。SDKは公式リポジトリから依存として導入されます。
 
 Unity Blender Pose SyncはRuntimeとEditorを1パッケージで導入できます。Unityの`D9speed / Animations / PoseSync Setup`で「セットアップ」を押すと、NuGetForUnityと公式MessagePackを導入し、完了項目を緑のチェックで表示します。同じ画面からBlender用アドオンの場所を開き、Blender側へインストールしてください。詳細は[使い方](packages/io.github.d9speed.unity_blender_pose_sync/README.md)と[検証記録](docs/pose_sync_nuget_validation_report.md)を参照してください。
 
@@ -56,6 +58,8 @@ Windows版Unity Editor 2022.3.22f1で、SDK不要の9パッケージを導入し
 追加5パッケージについて、SDKなし23項目・SDK入り4項目の確認が成功しました。詳細と確認範囲は[追加5パッケージの検証記録](docs/remaining_tools_validation_report.md)を参照してください。
 
 ## 検証範囲と今後の作業
+
+NVENC GPU Recorder 0.1.0は専用の新規プロジェクトで7項目の確認に成功しました。HEVC動画・CPU/Vulkan ProRes動画・透過PNGについて、実ファイルのフレーム数・順序・色・透明度も確認しています。[検証記録](docs/nvenc_recorder_validation_report.md)を参照してください。
 
 - SDK導入済み環境で任意連携を網羅的に確認。
 - 公開URLからVCC/ALCOMで新規導入・将来のバージョン更新を確認。

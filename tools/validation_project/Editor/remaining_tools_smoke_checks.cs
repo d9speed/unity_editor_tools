@@ -18,21 +18,18 @@ namespace D9speed.PackageValidation
         private const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
         public static void Run(Action<string, Action> check)
         {
-            check("Four new packages are registered and stay out of player assemblies", () =>
+            check("Three editor packages are registered and stay out of player assemblies", () =>
             {
                 var packages = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages();
-                foreach (var suffix in new[] { "animation_tools", "skinned_mesh_tools", "prefab_color_variants", "screen_texture_capture" })
+                foreach (var suffix in new[] { "animation_tools", "skinned_mesh_tools", "prefab_color_variants" })
                     require(packages.Any(p => p.name == "io.github.d9speed." + suffix && p.version == "0.1.0"), suffix);
                 require(!CompilationPipeline.GetAssemblies(AssembliesType.Player).Any(a => a.name.StartsWith("D9speed.")), "Editor-only assemblies");
-                var capture = packages.Single(p => p.name == "io.github.d9speed.screen_texture_capture");
-                require(!Directory.GetFiles(capture.resolvedPath, "*.exe", SearchOption.AllDirectories).Any(), "External executable bundled");
             });
-            check("Animation, color variant and capture menus open", () =>
+            check("Animation and color variant menus open", () =>
             {
                 open<AnimatorPlaybackPreviewWindow>("D9speed/Animation/Animator Playback Preview");
                 open<HumanoidRandomHandPoseWindow>("D9speed/Animation/Random Hand Muscle Generator");
                 open<PrefabColorVariantMaker>("D9speed/Tools/PrefabColorVariantMaker");
-                open<D9speed.ScreenTextureCapture.Editor.ScreenTextureCaptureWindow>("D9speed/Tools/Screen Texture Capture");
             });
             check("Hand pose API changes fingers and restores a generated humanoid", () =>
             {
@@ -135,26 +132,6 @@ namespace D9speed.PackageValidation
                     require(before.SequenceEqual(File.ReadAllBytes(source_path)), "Source prefab was modified");
                 }
                 finally { Object.DestroyImmediate(window); }
-            });
-            check("Capture rejects missing FFmpeg and restores temporary material binding", () =>
-            {
-                var window = ScriptableObject.CreateInstance<D9speed.ScreenTextureCapture.Editor.ScreenTextureCaptureWindow>();
-                var material = new Material(Shader.Find("Standard"));
-                var original = new Texture2D(2, 2);
-                var live = new Texture2D(2, 2);
-                try
-                {
-                    window.CreateGUI();
-                    var field = (UnityEngine.UIElements.TextField)get(window, "ffmpeg_field");
-                    field.SetValueWithoutNotify("missing_ffmpeg_fixture.exe");
-                    var args = new object[] { null, null };
-                    require(!(bool)window.GetType().GetMethod("TryBuildConfiguration", flags).Invoke(window, args), "Missing FFmpeg must reject start");
-                    material.mainTexture = live;
-                    set(window, "bound_material", material); set(window, "bound_property", "_MainTex"); set(window, "previous_texture", original);
-                    call(window, "RestoreBoundMaterial");
-                    require(material.mainTexture == original, "Material restoration");
-                }
-                finally { Object.DestroyImmediate(window); Object.DestroyImmediate(material); Object.DestroyImmediate(original); Object.DestroyImmediate(live); }
             });
         }
 

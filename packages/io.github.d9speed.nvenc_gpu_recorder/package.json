@@ -1,0 +1,17 @@
+{
+  "name": "io.github.d9speed.nvenc_gpu_recorder",
+  "displayName": "D9speed NVENC GPU Recorder",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "unityRelease": "22f1",
+  "description": "Camera and RenderTexture recording on Windows: direct GPU NVENC HEVC/MP4 and alpha ProRes 4444/MOV with PNG export. FFmpeg must be supplied separately.",
+  "author": {
+    "name": "d9speed",
+    "email": "d09pseed@gmail.com",
+    "url": "https://github.com/d9speed"
+  },
+  "license": "MIT",
+  "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.nvenc_gpu_recorder",
+  "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.nvenc_gpu_recorder/CHANGELOG.md",
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/nvenc_gpu_recorder_v0.1.0/io.github.d9speed.nvenc_gpu_recorder-0.1.0.zip"
+}

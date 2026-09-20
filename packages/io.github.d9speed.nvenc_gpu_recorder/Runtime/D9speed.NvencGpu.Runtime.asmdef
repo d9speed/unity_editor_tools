@@ -1,0 +1,7 @@
+{
+  "name": "D9speed.NvencGpu.Runtime",
+  "rootNamespace": "D9speed.NvencGpu",
+  "references": [],
+  "includePlatforms": [],
+  "autoReferenced": true
+}

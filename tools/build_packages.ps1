@@ -32,6 +32,10 @@ foreach ($directory in $package_directories) {
     $files = @(Get-ChildItem -LiteralPath $directory.FullName -Recurse -File)
     foreach ($file in $files) {
         if ($file.Extension -eq '.pyc') { throw "Python cache must not be packaged: $($file.FullName)" }
+        if ($manifest.name -ceq 'io.github.d9speed.nvenc_gpu_recorder' -and
+            ($file.FullName -match '[\\/](results~|build|__pycache__)[\\/]' -or $file.Extension -in @('.exe', '.mp4', '.mov', '.hevc', '.pdb', '.obj'))) {
+            throw "Local recorder output must not be packaged: $($file.FullName)"
+        }
         if ($file.Extension -eq '.meta') {
             $match = [regex]::Match((Get-Content -LiteralPath $file.FullName -Raw), '(?m)^guid: ([0-9a-f]{32})\s*$')
             if (-not $match.Success) { throw "Missing GUID: $($file.FullName)" }
@@ -44,6 +48,12 @@ foreach ($directory in $package_directories) {
     }
     foreach ($definition in ($files | Where-Object Extension -eq '.asmdef')) {
         $assembly = Get-Content -LiteralPath $definition.FullName -Raw | ConvertFrom-Json
+        if ($manifest.name -ceq 'io.github.d9speed.nvenc_gpu_recorder' -and
+            $definition.FullName -ceq (Join-Path $directory.FullName 'Runtime\D9speed.NvencGpu.Runtime.asmdef')) {
+            if ($assembly.name -cne 'D9speed.NvencGpu.Runtime' -or @($assembly.references).Count -ne 0 -or
+                @($assembly.includePlatforms).Count -ne 0) { throw 'Unexpected NVENC GPU Runtime assembly configuration' }
+            continue
+        }
         if ($manifest.name -ceq 'io.github.d9speed.unity_blender_pose_sync' -and
             $definition.FullName -ceq (Join-Path $directory.FullName 'Runtime\D9speed.PoseSync.Runtime.asmdef')) {
             if ($assembly.name -cne 'D9speed.PoseSync.Runtime' -or @($assembly.references).Count -ne 0 -or
