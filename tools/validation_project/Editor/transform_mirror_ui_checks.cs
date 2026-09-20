@@ -17,10 +17,17 @@ namespace D9speed.PackageValidation
         private static TransformMirrorTool window;
         private static IPanel test_panel;
         private static int frames;
+        private static bool preview_only;
         private static readonly List<string> checks = new List<string>();
         private static readonly List<string> errors = new List<string>();
 
         [Serializable] private sealed class Report { public bool passed; public string unity; public string[] checks; public string[] errors; }
+
+        public static void CapturePreview()
+        {
+            preview_only = true;
+            Run();
+        }
 
         public static void Run()
         {
@@ -62,6 +69,13 @@ namespace D9speed.PackageValidation
             try
             {
                 var root = window.rootVisualElement;
+                if (preview_only)
+                {
+                    Layout(root);
+                    Capture(root, "preview");
+                    checks.Add("Fresh Editor panel preview");
+                    return;
+                }
                 var theme_sheet_count = Enumerable.Range(0, root.styleSheets.count).Count(i => AssetDatabase.GetAssetPath(root.styleSheets[i]).Contains("/Editor/ui/"));
                 Require(theme_sheet_count == 4 && root.panel != null, "Style sheets or live Editor panel missing: " + theme_sheet_count + ", total=" + root.styleSheets.count + ", panel=" + (root.panel != null));
                 var initial_sheet_count = root.styleSheets.count;
@@ -158,7 +172,7 @@ namespace D9speed.PackageValidation
                 Object.DestroyImmediate(window);
                 Application.logMessageReceived -= Log;
                 var report = new Report { passed = errors.Count == 0, unity = Application.unityVersion, checks = checks.ToArray(), errors = errors.ToArray() };
-                File.WriteAllText("Logs/transform_mirror_ui/checks.json", JsonUtility.ToJson(report, true));
+                File.WriteAllText("Logs/transform_mirror_ui/" + (preview_only ? "preview_checks.json" : "checks.json"), JsonUtility.ToJson(report, true));
                 EditorApplication.Exit(report.passed ? 0 : 1);
             }
         }
