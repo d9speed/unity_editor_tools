@@ -38,3 +38,12 @@
 いずれもUnityを`-batchmode -executeMethod <対象メソッド>`で起動し、非同期更新を待つため`-quit`を付けません。検証コードが完了時の終了を制御します。
 
 今回の更新では、Blenderとの実TCP通信、Playerビルド、IL2CPPの再検証は行っていません。通信処理のコードは変更していません。
+
+## 公開・導入確認
+
+GitHub Releasesの両ZIPを認証なしで取得し、公開VPM一覧のSHA-256と一致することを確認しました。公開リポジトリからvrc-get 1.9.2で既存プロジェクトをAnimation Tools 0.1.1 / Pose Sync 0.1.2へ更新でき、導入ファイルすべてが公開ZIPと一致しています。
+
+- Animation Tools 0.1.1: SHA-256 `49df32e451f550e7c702e864646186b48763d9ede6cae168a99717efad105bae`
+- Pose Sync 0.1.2: SHA-256 `b0bc1a4eeb7d6f40274fcc2738d744c16526de89013a8fe71fbce3ee1d5cd4b6`
+
+パッケージ更新後、Unityで再コンパイルを待ち、`D9speed / Animations / PoseSync Setup`の「セットアップ／再試行」を押すとMessagePackの更新が始まります。
