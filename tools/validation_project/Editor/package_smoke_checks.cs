@@ -35,21 +35,22 @@ namespace D9speed.PackageValidation
                     Debug.LogError(name + ": " + error);
                 }
             };
-            check("Both packages registered at version 0.1.0", () =>
+            check("All five packages registered with expected versions and no optional SDK", () =>
             {
                 var packages = PackageInfo.GetAllRegisteredPackages();
-                foreach (var id in new[] { "io.github.d9speed.editor_core", "io.github.d9speed.scene_tools" })
-                    Require(packages.Any(p => p.name == id && p.version == "0.1.0"), "Missing package: " + id);
+                foreach (var suffix in new[] { "editor_core", "scene_tools", "humanoid_alias_copy", "package_exporter", "rename_tool" })
+                    Require(packages.Any(p => p.name == "io.github.d9speed." + suffix && p.version == (suffix == "editor_core" ? "0.1.1" : "0.1.0")), "Missing package: " + suffix);
+                Require(packages.Any(p => p.name == "com.unity.nuget.newtonsoft-json" && p.version == "3.2.1"), "Newtonsoft dependency");
                 Require(!packages.Any(p => p.name.StartsWith("com.vrchat.") || p.name.StartsWith("nadena.dev.")),
                     "This smoke test must run without optional VRChat packages.");
             });
             check("Tool code belongs to Editor-only package assemblies", () =>
             {
                 var editor = CompilationPipeline.GetAssemblies(AssembliesType.Editor);
-                foreach (var name in new[] { "D9speed.EditorUtils", "D9speed.SceneTools.Editor" })
+                foreach (var name in new[] { "D9speed.EditorUtils", "D9speed.SceneTools.Editor", "D9speed.HumanoidAliasCopy.Editor", "D9speed.PackageExporter.Editor", "D9speed.RenameTool.Editor" })
                     Require(editor.Any(a => a.name == name && (a.flags & AssemblyFlags.EditorAssembly) != 0), name);
                 var player = CompilationPipeline.GetAssemblies(AssembliesType.Player);
-                Require(!player.Any(a => a.name == "D9speed.EditorUtils" || a.name == "D9speed.SceneTools.Editor"),
+                Require(!player.Any(a => a.name.StartsWith("D9speed.")),
                     "Editor tools must not appear in player assemblies.");
             });
             check("Source GUIDs resolve inside the installed packages", () =>
@@ -113,6 +114,7 @@ namespace D9speed.PackageValidation
                 }
                 finally { Object.DestroyImmediate(mesh); }
             });
+            ToolsSmokeChecks.Run(check);
             report.passed = report.checks.All(c => c.passed);
             Directory.CreateDirectory("Logs");
             File.WriteAllText("Logs/package_smoke_results.json", JsonUtility.ToJson(report, true));

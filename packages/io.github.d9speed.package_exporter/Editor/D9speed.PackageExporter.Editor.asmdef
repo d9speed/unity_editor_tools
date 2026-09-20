@@ -1,0 +1,14 @@
+{
+  "name": "D9speed.PackageExporter.Editor",
+  "references": [
+    "D9speed.EditorUtils"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ]
+}

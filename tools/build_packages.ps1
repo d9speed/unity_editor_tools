@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$output_directory)
+param([string]$output_directory, [string[]]$package_ids = @())
 
 $ErrorActionPreference = 'Stop'
 $repo_root = Split-Path -Parent $PSScriptRoot
@@ -8,6 +8,9 @@ if ([string]::IsNullOrWhiteSpace($output_directory)) {
 }
 $packages_root = Join-Path $repo_root 'packages'
 $package_directories = @(Get-ChildItem -LiteralPath $packages_root -Directory | Sort-Object Name)
+foreach ($id in $package_ids) {
+    if ($id -notin $package_directories.Name) { throw "Unknown package: $id" }
+}
 $plans = @()
 $guid_paths = @{}
 foreach ($directory in $package_directories) {
@@ -23,7 +26,8 @@ foreach ($directory in $package_directories) {
     $zip_name = "$($manifest.name)-$($manifest.version).zip"
     if (-not $manifest.url.EndsWith('/' + $zip_name)) { throw 'Download URL does not match ZIP name' }
     $zip_path = Join-Path $output_directory $zip_name
-    if (Test-Path -LiteralPath $zip_path) { throw "ZIP already exists: $zip_path" }
+    $selected = $package_ids.Count -eq 0 -or $manifest.name -in $package_ids
+    if ($selected -and (Test-Path -LiteralPath $zip_path)) { throw "ZIP already exists: $zip_path" }
     $files = @(Get-ChildItem -LiteralPath $directory.FullName -Recurse -File)
     foreach ($file in $files) {
         if ($file.Extension -eq '.meta') {
@@ -47,7 +51,9 @@ foreach ($directory in $package_directories) {
             throw "Missing local dependency: $($dependency.Name)"
         }
     }
-    $plans += [pscustomobject]@{ directory=$directory.FullName; manifest=$manifest; zip_path=$zip_path }
+    if ($selected) {
+        $plans += [pscustomobject]@{ directory=$directory.FullName; manifest=$manifest; zip_path=$zip_path }
+    }
 }
 New-Item -ItemType Directory -Path $output_directory -Force | Out-Null
 $report = @()

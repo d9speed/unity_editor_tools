@@ -1,6 +1,6 @@
 # D9speed Editor Core
 
-D9speedのEditor拡張が共有する補助処理です。初版はScene Toolsに必要な`EditorObjectHelper`を収録します。
+D9speedのEditor拡張が共有する補助処理です。オブジェクト検索、ヒューマノイド対応付け、階層パス、コンポーネントコピー、ファイル名の処理、共通フォント設定を収録します。
 
 - 対応基準: Unity 2022.3.22f1。
 - Editor専用。VRChat SDK、外部DLL、専用Runtimeは不要です。
@@ -9,13 +9,13 @@ D9speedのEditor拡張が共有する補助処理です。初版はScene Tools�
 
 `FindSceneObjects<T>()`は有効なシーンオブジェクトを取得します。`true`を渡すと非アクティブも含めます。`GetObjectId()`はEditorセッション内の識別子を返します。
 
-既存のEditorToolにあるカメラ操作、通知、設定画面などは今後の切り分け対象です。この初版には含めません。
+フォントは`Edit > Preferences > D9speed Tools`で設定できます。未指定時はUnity標準フォントを使用します。カメラ操作や個人用の通知・認証設定は含めません。0.1.1はScene Tools 0.1.0と併用できます。
 
 ## 導入
 
 [案内ページ](https://d9speed.github.io/Unity_Tools/)からVCC/ALCOMへリポジトリを追加します。
 
-VCC/ALCOMでScene Toolsを導入すると、本パッケージも依存パッケージとして導入されます。ローカル検証では両方を新規プロジェクトの`Packages`へ配置します。
+VCC/ALCOMで各ツールを導入すると、本パッケージも依存パッケージとして導入されます。
 
 既存のEditorToolがあるプロジェクトへの移行は未対応です。同じGUID・アセンブリ名・型を持つファイルの重複を避けるため、まず新規プロジェクトで検証してください。元ファイルを削除する`legacyFolders`・`legacyFiles`は設定していません。
 
