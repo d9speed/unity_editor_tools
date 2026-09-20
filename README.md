@@ -15,7 +15,7 @@ Unity Editor拡張を、機能ごとのVPMパッケージとして管理しま�
 | `io.github.d9speed.skinned_mesh_tools` | SkinnedMeshRendererのInspector拡張 |
 | `io.github.d9speed.prefab_color_variants` | マテリアルを置き換えたPrefab Variantの作成 |
 | `io.github.d9speed.screen_texture_capture` | Windows画面範囲をライブTextureへ取得。FFmpegは別途指定 |
-| `io.github.d9speed.cloth_fitting_tools` | PhysBoneコライダー生成、ProxyへのVRC Constraint設定 |
+| `io.github.d9speed.cloth_fitting_tools` | PhysBoneコライダー生成 |
 | `io.github.d9speed.unity_blender_pose_sync` | UnityからBlenderへのポーズ・カメラ同期。RuntimeとBlenderアドオンを同梱 |
 
 ## 導入

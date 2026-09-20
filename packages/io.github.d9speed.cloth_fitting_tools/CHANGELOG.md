@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 - 2026-09-21
+
+- ProxVRCphysboneSettingsを廃止し、ソースとメニューを削除。
+- 収録内容をPhysBone Weight Collider Generatorのみに変更。
+
 ## 0.1.0 - 2026-09-20
 
 - PhysBone Weight Collider GeneratorとProxVRCphysboneSettingsをVPMパッケージとして公開。
