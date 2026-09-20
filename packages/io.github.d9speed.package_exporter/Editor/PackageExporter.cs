@@ -456,9 +456,13 @@ public class PackageExporter : EditorWindow
             overrideExclusionForSubfolders = value;
             OnMainSettingChanged();
         }));
+        var keywordsFoldout = EditorUiControls.Foldout("除外する拡張子・キーワード");
+        keywordsFoldout.name = "exclusion_keywords";
+        keywordsFoldout.viewDataKey = "export_exclusion_keywords";
+        box.Add(keywordsFoldout);
         exclusionKeywordsContainer = new VisualElement();
-        box.Add(exclusionKeywordsContainer);
-        box.Add(CreateButton("除外キーワードを追加", () =>
+        keywordsFoldout.Add(exclusionKeywordsContainer);
+        keywordsFoldout.Add(CreateButton("除外キーワードを追加", () =>
         {
             Undo.RecordObject(PackageExporterSettings.instance, "PackageExporter Exclusion Keyword Added");
             PackageExporterSettings.instance.exclusionKeywords.Add(string.Empty);

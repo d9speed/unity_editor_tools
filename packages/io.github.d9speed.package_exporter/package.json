@@ -1,7 +1,7 @@
 {
   "name": "io.github.d9speed.package_exporter",
   "displayName": "D9speed Package Exporter",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "description": "Batch-export Unity packages and compare component reports, with profiles, exclusions, and dependency checks.",
@@ -16,7 +16,7 @@
   },
   "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.package_exporter",
   "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.package_exporter/CHANGELOG.md",
-  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/package_exporter_v0.1.2/io.github.d9speed.package_exporter-0.1.2.zip",
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/package_exporter_v0.1.3/io.github.d9speed.package_exporter-0.1.3.zip",
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.1"
   }
