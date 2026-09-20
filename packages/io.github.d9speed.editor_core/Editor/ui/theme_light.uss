@@ -1,0 +1,20 @@
+.d9_ui_root.d9_theme_light {
+    --d9_color_canvas: #f5f5f5;
+    --d9_color_surface: #ffffff;
+    --d9_color_input: #ffffff;
+    --d9_color_hover: #ebebeb;
+    --d9_color_pressed: #e0e0e0;
+    --d9_color_border: #d1d1d1;
+    --d9_color_input_border: #8a8886;
+    --d9_color_text: #242424;
+    --d9_color_secondary: #616161;
+    --d9_color_disabled: #707070;
+    --d9_color_disabled_surface: #e6e6e6;
+    --d9_color_brand: var(--d9_color_brand_80);
+    --d9_color_brand_hover: var(--d9_color_brand_70);
+    --d9_color_brand_pressed: #0c3b5e;
+    --d9_color_on_brand: var(--d9_color_white);
+    --d9_color_focus: var(--d9_color_brand_80);
+    --d9_color_selected: #ebf3fc;
+    --d9_color_selected_text: #0c3b5e;
+}

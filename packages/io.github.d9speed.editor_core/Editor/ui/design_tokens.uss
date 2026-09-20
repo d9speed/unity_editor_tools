@@ -1,0 +1,18 @@
+.d9_ui_root {
+    --d9_space_xs: 4px;
+    --d9_space_s: 8px;
+    --d9_space_m: 12px;
+    --d9_space_l: 16px;
+    --d9_space_xl: 24px;
+    --d9_radius_control: 4px;
+    --d9_radius_surface: 8px;
+    --d9_font_body: 13px;
+    --d9_font_caption: 12px;
+    --d9_font_title: 20px;
+    --d9_control_height: 32px;
+    --d9_color_white: #ffffff;
+    --d9_color_brand_70: #115ea3;
+    --d9_color_brand_80: #0f6cbd;
+    --d9_color_brand_90: #2886de;
+    --d9_color_brand_110: #62abf5;
+}

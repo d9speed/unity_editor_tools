@@ -27,6 +27,14 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 
 Transform Resetの割り当てはUnityのShortcutsにある`Custom/ShortCutEX/TransformReset`で変更できます。
 
+### Transform MirrorのUI
+
+0.1.4で、[Fluent 2のトークン設計](https://fluent2.microsoft.design/design-tokens)を基にしたUI Toolkitの共通スタイルを試験導入しています。Unityのライト／ダークに合わせて色を切り替えます。対象一覧へGameObjectやPrefabをドロップして、設定後に「ミラーを作成」を押します。「一覧をクリア」は一覧だけを空にし、シーンやアセットは削除しません。
+
+狭いウィンドウでは設定部分がスクロールし、実行ボタンは下部に表示されます。カスタム基準点を使わないときは座標欄を無効にし、ワールド原点を基準にします。対象と各オプションはスクリプトの再読み込みでも保持します。
+
+共通スタイルは`Editor/ui`にあります。独自のEditorWindowへ適用する場合は、`CreateGUI()`から`EditorUiTheme.Apply(rootVisualElement)`を呼びます。開いたままのテーマ変更には`EditorUiTheme.RefreshTheme(rootVisualElement)`を`OnInspectorUpdate()`から呼びます。クラス`d9_ui_root`の配下だけに作用し、共通フォント設定を引き継ぎます。現在の適用先はTransform Mirrorです。
+
 アセット複製は既存のコピーを上書きせず、別名で作成します。参照置換はUnityのYAMLテキスト形式が対象です。選択範囲の外にある依存アセットは追加コピーせず、元の参照を維持します。バイナリ形式のアセット内の参照置換には対応しません。
 
 ## 設定

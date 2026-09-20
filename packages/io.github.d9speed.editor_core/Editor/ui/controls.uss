@@ -1,0 +1,285 @@
+.d9_ui_root {
+    flex-grow: 1;
+    background-color: var(--d9_color_canvas);
+    color: var(--d9_color_text);
+    font-size: var(--d9_font_body);
+}
+
+.d9_ui_root .unity-label {
+    color: var(--d9_color_text);
+}
+
+.d9_ui_root .d9_scroll {
+    flex-grow: 1;
+}
+
+.d9_ui_root .d9_content {
+    padding: var(--d9_space_l);
+}
+
+.d9_ui_root .d9_header {
+    margin-bottom: var(--d9_space_l);
+}
+
+.d9_ui_root .d9_title {
+    margin: 0 0 var(--d9_space_xs) 0;
+    font-size: var(--d9_font_title);
+    -unity-font-style: bold;
+}
+
+.d9_ui_root .d9_description {
+    margin: 0;
+    color: var(--d9_color_secondary);
+    font-size: var(--d9_font_caption);
+    white-space: normal;
+}
+
+.d9_ui_root .d9_section {
+    padding: var(--d9_space_l);
+    margin-bottom: var(--d9_space_m);
+    background-color: var(--d9_color_surface);
+    border-width: 1px;
+    border-color: var(--d9_color_border);
+    border-radius: var(--d9_radius_surface);
+}
+
+.d9_ui_root .d9_section_header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: var(--d9_space_s);
+}
+
+.d9_ui_root .d9_section_title {
+    flex-grow: 1;
+    margin: 0;
+    -unity-font-style: bold;
+}
+
+.d9_ui_root .d9_badge {
+    margin: 0;
+    padding: 2px var(--d9_space_s);
+    background-color: var(--d9_color_selected);
+    color: var(--d9_color_selected_text);
+    border-radius: var(--d9_radius_control);
+    font-size: var(--d9_font_caption);
+}
+
+.d9_ui_root .d9_list_container {
+    margin-top: var(--d9_space_m);
+}
+
+.d9_ui_root .d9_target_list {
+    height: 132px;
+    background-color: var(--d9_color_input);
+    border-width: 1px;
+    border-color: var(--d9_color_border);
+    border-radius: var(--d9_radius_control);
+}
+
+.d9_ui_root .d9_target_list:focus,
+.d9_ui_root .d9_target_list.d9_drop_active {
+    border-color: var(--d9_color_focus);
+}
+
+.d9_ui_root .d9_target_list .unity-list-view__empty-label {
+    display: none;
+}
+
+.d9_ui_root .d9_list_row {
+    margin: 0;
+    padding: 0 var(--d9_space_s);
+    flex-grow: 1;
+    -unity-text-align: middle-left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.d9_ui_root .d9_target_list .unity-collection-view__item:hover {
+    background-color: var(--d9_color_hover);
+}
+
+.d9_ui_root .d9_target_list .unity-collection-view__item--selected {
+    background-color: var(--d9_color_selected);
+}
+
+.d9_ui_root .d9_target_list .unity-collection-view__item--selected .d9_list_row {
+    color: var(--d9_color_selected_text);
+}
+
+.d9_ui_root .d9_empty_state {
+    position: absolute;
+    top: 0;
+    right: var(--d9_space_l);
+    bottom: 0;
+    left: var(--d9_space_l);
+    color: var(--d9_color_secondary);
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.d9_ui_root .d9_list_actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: var(--d9_space_s);
+}
+
+.d9_ui_root .d9_button {
+    min-height: var(--d9_control_height);
+    margin: 0;
+    padding: var(--d9_space_xs) var(--d9_space_m);
+    background-image: none;
+    background-color: var(--d9_color_surface);
+    color: var(--d9_color_text);
+    border-width: 1px;
+    border-color: var(--d9_color_border);
+    border-radius: var(--d9_radius_control);
+    -unity-text-align: middle-center;
+}
+
+.d9_ui_root .d9_button:hover {
+    background-color: var(--d9_color_hover);
+}
+
+.d9_ui_root .d9_button:active {
+    background-color: var(--d9_color_pressed);
+}
+
+.d9_ui_root .d9_button_primary {
+    background-color: var(--d9_color_brand);
+    color: var(--d9_color_on_brand);
+    border-color: var(--d9_color_brand);
+    -unity-font-style: bold;
+}
+
+.d9_ui_root .d9_button_primary:hover {
+    background-color: var(--d9_color_brand_hover);
+    border-color: var(--d9_color_brand_hover);
+}
+
+.d9_ui_root .d9_button_primary:active {
+    background-color: var(--d9_color_brand_pressed);
+    border-color: var(--d9_color_brand_pressed);
+}
+
+.d9_ui_root .d9_button:focus {
+    border-color: var(--d9_color_focus);
+    border-width: 2px;
+}
+
+.d9_ui_root .d9_button_primary:focus {
+    border-color: var(--d9_color_on_brand);
+}
+
+.d9_ui_root .d9_button:disabled {
+    opacity: 1;
+    background-color: var(--d9_color_disabled_surface);
+    color: var(--d9_color_disabled);
+    border-color: var(--d9_color_border);
+}
+
+.d9_ui_root .d9_toggle {
+    margin: var(--d9_space_xs) 0;
+    min-height: 24px;
+}
+
+.d9_ui_root .d9_toggle .unity-toggle__input {
+    background-color: transparent;
+    border-width: 0;
+    margin: 0;
+}
+
+.d9_ui_root .d9_toggle .unity-toggle__checkmark {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-right: var(--d9_space_s);
+    background-image: none;
+    background-color: var(--d9_color_input);
+    border-width: 1px;
+    border-color: var(--d9_color_input_border);
+    border-radius: var(--d9_radius_control);
+    align-items: center;
+    justify-content: center;
+}
+
+.d9_ui_root .d9_check_glyph {
+    display: none;
+    width: 5px;
+    height: 9px;
+    margin-bottom: 3px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-right-color: var(--d9_color_on_brand);
+    border-bottom-color: var(--d9_color_on_brand);
+    rotate: 45deg;
+}
+
+.d9_ui_root .d9_toggle:checked .d9_check_glyph {
+    display: flex;
+}
+
+.d9_ui_root .d9_toggle .unity-toggle__text {
+    flex-shrink: 1;
+    margin: 0;
+    white-space: normal;
+}
+
+.d9_ui_root .d9_toggle:checked .unity-toggle__checkmark {
+    background-color: var(--d9_color_brand);
+    border-color: var(--d9_color_brand);
+    -unity-background-image-tint-color: var(--d9_color_on_brand);
+}
+
+.d9_ui_root .d9_toggle:focus .unity-toggle__checkmark {
+    border-color: var(--d9_color_focus);
+    border-width: 2px;
+}
+
+.d9_ui_root .d9_vector_field {
+    margin: var(--d9_space_s) 0 var(--d9_space_m) 0;
+    flex-direction: column;
+}
+
+.d9_ui_root .d9_vector_field > .unity-base-field__label {
+    margin-bottom: var(--d9_space_xs);
+    color: var(--d9_color_secondary);
+    min-width: 0;
+}
+
+.d9_ui_root .d9_vector_field .unity-base-text-field__input {
+    min-height: 28px;
+    background-color: var(--d9_color_input);
+    color: var(--d9_color_text);
+    border-width: 1px;
+    border-color: var(--d9_color_border);
+    border-bottom-color: var(--d9_color_input_border);
+    border-radius: var(--d9_radius_control);
+    padding: 2px var(--d9_space_xs);
+}
+
+.d9_ui_root .d9_vector_field .unity-base-field__input:focus {
+    border-color: var(--d9_color_focus);
+}
+
+.d9_ui_root .d9_vector_field:disabled .unity-base-text-field__input {
+    background-color: var(--d9_color_disabled_surface);
+    color: var(--d9_color_disabled);
+    border-color: var(--d9_color_border);
+}
+
+.d9_ui_root .d9_footer {
+    flex-shrink: 0;
+    padding: var(--d9_space_m) var(--d9_space_l);
+    background-color: var(--d9_color_surface);
+    border-top-width: 1px;
+    border-top-color: var(--d9_color_border);
+}
+
+.d9_ui_root .d9_footer .d9_description {
+    margin-top: var(--d9_space_s);
+    -unity-text-align: middle-center;
+}
+
+.d9_ui_root .d9_hidden {
+    display: none;
+}

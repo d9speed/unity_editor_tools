@@ -13,16 +13,20 @@ namespace D9speed_BaseEditorUtils
 {
 public class TransformMirrorTool : EditorWindow
 {
-    private List<UnityEngine.Object> targetObjects = new();
+    [SerializeField] private List<UnityEngine.Object> targetObjects = new();
     private ListView listView;
+    private Label target_count;
+    private Label empty_state;
+    private Button clear_button;
+    private Button mirror_button;
 
-    private bool useCustomPivot = false;
+    [SerializeField] private bool useCustomPivot = false;
 
-    private Vector3 customPivot = Vector3.zero;
+    [SerializeField] private Vector3 customPivot = Vector3.zero;
 
     // 回転の切り替えトグル
-    private bool mirrorRotation = true;
-    private bool CopyblendshapesWeightValue = true;
+    [SerializeField] private bool mirrorRotation = true;
+    [SerializeField] private bool CopyblendshapesWeightValue = true;
 
     [MenuItem("D9speed/Transform Mirror Tool")]
     public static void ShowWindow()
@@ -32,65 +36,159 @@ public class TransformMirrorTool : EditorWindow
 
     public void CreateGUI()
     {
+        minSize = new Vector2(340, 380);
         var root = rootVisualElement;
         root.Clear();
-        root.style.paddingLeft = 10;
-        root.style.paddingRight = 10;
-        root.style.paddingTop = 10;
-        D9speedEditorFontUtility.Apply(root);
+        EditorUiTheme.Apply(root);
 
-        root.Add(new Label("Drag & Drop GameObjects or Prefabs"));
+        var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "mirror_scroll" };
+        scroll.AddToClassList("d9_scroll");
+        root.Add(scroll);
+        var content = new VisualElement();
+        content.AddToClassList("d9_content");
+        scroll.Add(content);
 
-        listView = new ListView(targetObjects, 20, () => new Label(), (e, i) =>
+        var header = new VisualElement();
+        header.AddToClassList("d9_header");
+        header.Add(CreateLabel("Transform Mirror", "d9_title"));
+        header.Add(CreateLabel("X軸を基準に、反転したコピーを作成します。", "d9_description"));
+        content.Add(header);
+
+        var targets = new VisualElement();
+        targets.AddToClassList("d9_section");
+        content.Add(targets);
+        var target_header = new VisualElement();
+        target_header.AddToClassList("d9_section_header");
+        target_header.Add(CreateLabel("複製するオブジェクト", "d9_section_title"));
+        target_count = CreateLabel(string.Empty, "d9_badge");
+        target_count.name = "target_count";
+        target_header.Add(target_count);
+        targets.Add(target_header);
+        targets.Add(CreateLabel("Hierarchy / Project からドラッグ＆ドロップ", "d9_description"));
+
+        var list_container = new VisualElement();
+        list_container.AddToClassList("d9_list_container");
+        targets.Add(list_container);
+        listView = new ListView(targetObjects, 28, () => CreateLabel(string.Empty, "d9_list_row"), (e, i) =>
         {
             (e as Label).text = targetObjects[i] != null ? targetObjects[i].name : "<null>";
-        });
-        listView.style.height = 200;
+        }) { name = "mirror_targets" };
+        listView.AddToClassList("d9_target_list");
         listView.selectionType = SelectionType.Multiple;
         listView.reorderable = true;
-
         listView.RegisterCallback<DragUpdatedEvent>(evt =>
         {
+            if (!DragAndDrop.objectReferences.Any(obj => obj is GameObject)) return;
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+            listView.AddToClassList("d9_drop_active");
+            evt.StopPropagation();
         });
-
+        listView.RegisterCallback<DragLeaveEvent>(_ => listView.RemoveFromClassList("d9_drop_active"));
+        listView.RegisterCallback<DragExitedEvent>(_ => listView.RemoveFromClassList("d9_drop_active"));
         listView.RegisterCallback<DragPerformEvent>(evt =>
         {
+            if (!DragAndDrop.objectReferences.Any(obj => obj is GameObject)) return;
             DragAndDrop.AcceptDrag();
             foreach (var obj in DragAndDrop.objectReferences)
             {
                 if (obj is GameObject)
                     targetObjects.Add(obj);
             }
+            listView.RemoveFromClassList("d9_drop_active");
             listView.Rebuild();
+            RefreshTargetState();
+            evt.StopPropagation();
         });
+        list_container.Add(listView);
+        empty_state = CreateLabel("GameObject / Prefab をここへ追加", "d9_empty_state");
+        empty_state.pickingMode = PickingMode.Ignore;
+        list_container.Add(empty_state);
 
-        root.Add(listView);
-
-        var pivotToggle = new Toggle("基準点をカスタムにする (デフォルト：ワールド原点)");
-        pivotToggle.RegisterValueChangedCallback(evt => useCustomPivot = evt.newValue);
-        root.Add(pivotToggle);
-
-        var pivotField = new Vector3Field("カスタム基準点");
-        pivotField.value = customPivot;
-        pivotField.RegisterValueChangedCallback(evt => customPivot = evt.newValue);
-        root.Add(pivotField);
-
-        var rotToggle = new Toggle("回転もミラーする(YZ)") { value = mirrorRotation };
-        rotToggle.RegisterValueChangedCallback(evt => mirrorRotation = evt.newValue);
-        root.Add(rotToggle);
-
-        var blendshapeToggle = new Toggle("ブレンドシェイプのウェイトもコピーする") { value = CopyblendshapesWeightValue };
-        blendshapeToggle.RegisterValueChangedCallback(evt => CopyblendshapesWeightValue = evt.newValue);
-        root.Add(blendshapeToggle);
-
-        var button = new Button(() => InstantiateMirroredAll())
+        var list_actions = new VisualElement();
+        list_actions.AddToClassList("d9_list_actions");
+        clear_button = new Button(() =>
         {
-            text = "Prefab → シーン複製 & ミラー配置"
+            targetObjects.Clear();
+            listView.ClearSelection();
+            listView.Rebuild();
+            RefreshTargetState();
+        }) { name = "clear_targets", text = "一覧をクリア", tooltip = "一覧から外します。シーンやアセットは削除しません。" };
+        clear_button.AddToClassList("d9_button");
+        list_actions.Add(clear_button);
+        targets.Add(list_actions);
+
+        var settings = new VisualElement();
+        settings.AddToClassList("d9_section");
+        settings.Add(CreateLabel("ミラー設定", "d9_section_title"));
+        content.Add(settings);
+        var pivotToggle = CreateToggle("基準点を指定する", useCustomPivot, "use_custom_pivot");
+        settings.Add(pivotToggle);
+        settings.Add(CreateLabel("通常はワールド原点 (0, 0, 0) を使います。", "d9_description"));
+
+        var pivotField = new Vector3Field("基準点") { name = "custom_pivot", value = customPivot };
+        pivotField.AddToClassList("d9_vector_field");
+        pivotField.SetEnabled(useCustomPivot);
+        pivotToggle.RegisterValueChangedCallback(evt =>
+        {
+            useCustomPivot = evt.newValue;
+            pivotField.SetEnabled(useCustomPivot);
+        });
+        pivotField.RegisterValueChangedCallback(evt => customPivot = evt.newValue);
+        settings.Add(pivotField);
+
+        var rotToggle = CreateToggle("回転も反転する (Y / Z)", mirrorRotation, "mirror_rotation");
+        rotToggle.RegisterValueChangedCallback(evt => mirrorRotation = evt.newValue);
+        settings.Add(rotToggle);
+
+        var blendshapeToggle = CreateToggle("BlendShapeのウェイトを引き継ぐ", CopyblendshapesWeightValue, "copy_blendshapes");
+        blendshapeToggle.RegisterValueChangedCallback(evt => CopyblendshapesWeightValue = evt.newValue);
+        settings.Add(blendshapeToggle);
+
+        var footer = new VisualElement();
+        footer.AddToClassList("d9_footer");
+        mirror_button = new Button(() => InstantiateMirroredAll())
+        {
+            name = "create_mirror", text = "ミラーを作成"
         };
-        button.style.marginTop = 10;
-        button.style.height = 32;
-        root.Add(button);
+        mirror_button.AddToClassList("d9_button");
+        mirror_button.AddToClassList("d9_button_primary");
+        footer.Add(mirror_button);
+        footer.Add(CreateLabel("シーンに複製して配置します。Undoで元に戻せます。", "d9_description"));
+        root.Add(footer);
+        RefreshTargetState();
+    }
+
+    private static Label CreateLabel(string text, string style_class)
+    {
+        var label = new Label(text);
+        label.AddToClassList(style_class);
+        return label;
+    }
+
+    private static Toggle CreateToggle(string text, bool value, string name)
+    {
+        var toggle = new Toggle { text = text, value = value, name = name };
+        toggle.AddToClassList("d9_toggle");
+        var glyph = new VisualElement { pickingMode = PickingMode.Ignore };
+        glyph.AddToClassList("d9_check_glyph");
+        toggle.Q(className: Toggle.checkmarkUssClassName).Add(glyph);
+        return toggle;
+    }
+
+    private void OnInspectorUpdate()
+    {
+        EditorUiTheme.RefreshTheme(rootVisualElement);
+        RefreshTargetState();
+    }
+
+    private void RefreshTargetState()
+    {
+        if (mirror_button == null) return;
+        var count = targetObjects.Count(obj => obj is GameObject);
+        target_count.text = count + " 件";
+        empty_state.EnableInClassList("d9_hidden", targetObjects.Count > 0);
+        clear_button.SetEnabled(targetObjects.Count > 0);
+        mirror_button.SetEnabled(count > 0);
     }
 
     // ============================================================

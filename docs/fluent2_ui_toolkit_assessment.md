@@ -1,6 +1,6 @@
 # Fluent 2 / UI Toolkit 適合性評価
 
-2026-09-21。対象は公開VPMの11パッケージとUnity 2022.3.22f1です。公開ソースの静的調査と公式仕様に基づく評価で、Fluentテーマの実装・画面表示試験はまだ行っていません。
+2026-09-21。以下はEditor Core 0.1.3時点の公開VPMの11パッケージとUnity 2022.3.22f1を対象とする評価です。その後、0.1.4でTransform Mirrorへ共通スタイルを試験導入しました。実装と表示確認の結果は[初回導入の検証記録](transform_mirror_fluent_validation_report.md)を参照してください。
 
 ## 判定
 
@@ -59,7 +59,7 @@ Fluentの配色を使うだけでアクセシビリティ全体が保証され�
 
 ## 推奨する共通基盤
 
-Editor CoreのEditor配下へ、次の役割を分けて追加する案です（未実装）。
+評価時点では、Editor CoreのEditor配下へ、次の役割を分けて追加する案を提案しました。0.1.4ではこの構成で初回実装しています。
 
 - `ui/design_tokens.uss`: 基本値と用途別の変数。例は`--d9_color_surface`、`--d9_color_text`、`--d9_color_success`、`--d9_space_m`。
 - `ui/theme_dark.uss` / `ui/theme_light.uss`: 色の切り替え。
