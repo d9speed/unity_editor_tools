@@ -1,0 +1,16 @@
+{
+    "name": "D9speed.EditorUtils",
+    "rootNamespace": "D9speed_BaseEditorUtils",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,15 @@
+/artifacts/
+/.validation/
+/docs/migration_plan.md
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+.vs/
+.idea/
+*.csproj
+*.sln
+.env
+.env.*
+!.env.example

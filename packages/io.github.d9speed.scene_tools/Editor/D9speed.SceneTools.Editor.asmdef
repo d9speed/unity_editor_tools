@@ -1,0 +1,6 @@
+{
+  "name": "D9speed.SceneTools.Editor",
+  "references": ["D9speed.EditorUtils"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}
