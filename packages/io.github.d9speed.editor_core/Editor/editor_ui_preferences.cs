@@ -14,18 +14,6 @@ public static class D9speedCommonEditorPrefs
         set { EditorPrefs.SetBool("D9speed_Core_ShowPrefabOverrideIcon", value); EditorApplication.RepaintHierarchyWindow(); }
     }
 
-    public static string AutoHotkeyExecutablePath
-    {
-        get => EditorPrefs.GetString("D9speed_Core_AutoHotkeyExecutablePath", string.Empty);
-        set => EditorPrefs.SetString("D9speed_Core_AutoHotkeyExecutablePath", value ?? string.Empty);
-    }
-
-    public static string SakuraGrepScriptPath
-    {
-        get => EditorPrefs.GetString("D9speed_Core_SakuraGrepScriptPath", string.Empty);
-        set => EditorPrefs.SetString("D9speed_Core_SakuraGrepScriptPath", value ?? string.Empty);
-    }
-
     public static bool UseCustomUiFont
     {
         get => EditorPrefs.GetBool(key_use_custom_font, false);
@@ -71,7 +59,7 @@ namespace D9speed_BaseEditorUtils
         {
             return new SettingsProvider("Preferences/D9speed Tools", SettingsScope.User)
             {
-                keywords = new[] { "D9speed", "Font", "Prefab", "Override", "AutoHotkey", "Sakura", "フォント", "設定" },
+                keywords = new[] { "D9speed", "Font", "Prefab", "Override", "フォント", "設定" },
                 guiHandler = _ =>
                 {
                     EditorGUILayout.LabelField("Editor拡張のフォント", EditorStyles.boldLabel);
@@ -94,33 +82,9 @@ namespace D9speed_BaseEditorUtils
                     var show_icon = EditorGUILayout.Toggle("Prefab変更マークを表示", D9speedCommonEditorPrefs.ShowPrefabOverrideIcon);
                     if (EditorGUI.EndChangeCheck()) D9speedCommonEditorPrefs.ShowPrefabOverrideIcon = show_icon;
 
-                    EditorGUILayout.Space(8);
-                    EditorGUILayout.LabelField("サクラエディタ連携（Windows）", EditorStyles.boldLabel);
-                    EditorGUI.BeginChangeCheck();
-                    var executable = DrawFilePath("AutoHotkey本体", D9speedCommonEditorPrefs.AutoHotkeyExecutablePath, "exe");
-                    var script = DrawFilePath("Grep用AHKスクリプト", D9speedCommonEditorPrefs.SakuraGrepScriptPath, "ahk");
-                    if (EditorGUI.EndChangeCheck())
-                    {
-                        D9speedCommonEditorPrefs.AutoHotkeyExecutablePath = executable;
-                        D9speedCommonEditorPrefs.SakuraGrepScriptPath = script;
-                    }
-                    EditorGUILayout.HelpBox("AutoHotkey・サクラエディタ・Grep用スクリプトは別途用意してください。選択したアセットのフルパスをスクリプトの第1引数へ渡します。", MessageType.Info);
                 }
             };
         }
 
-        private static string DrawFilePath(string label, string value, string extension)
-        {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                value = EditorGUILayout.TextField(label, value);
-                if (GUILayout.Button("参照", GUILayout.Width(48)))
-                {
-                    var selected = EditorUtility.OpenFilePanel(label, string.Empty, extension);
-                    if (!string.IsNullOrEmpty(selected)) { value = selected; GUI.changed = true; }
-                }
-            }
-            return value;
-        }
     }
 }

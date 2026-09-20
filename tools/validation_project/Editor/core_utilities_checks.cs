@@ -39,7 +39,7 @@ namespace D9speed.PackageValidation
                     Require(!CompilationPipeline.GetAssemblies(AssembliesType.Player).Any(a => a.name == "D9speed.EditorUtils"), "Core included in Player");
                     var provider = (SettingsProvider)Call("EditorUiPreferences", "create_provider");
                     Require(provider.settingsPath == "Preferences/D9speed Tools" && provider.scope == SettingsScope.User, "Provider identity changed");
-                    Require(provider.keywords.Contains("AutoHotkey") && provider.keywords.Contains("Prefab"), "Missing settings keywords");
+                    Require(provider.keywords.Contains("Font") && provider.keywords.Contains("Prefab"), "Missing settings keywords");
                     Require(EditorApplication.ExecuteMenuItem("D9speed/Settings"), "Settings menu missing");
                 });
                 check("Full paths resolve Assets, folders, package cache and multiple selections", () => {
@@ -134,8 +134,8 @@ namespace D9speed.PackageValidation
                     try { CopyAssetsWithDependency.GetAllAssetAndCopyPaths(new[] {"Packages/io.github.d9speed.editor_core"}); } catch (ArgumentException) { rejected = true; }
                     Require(rejected, "Package source accepted for direct duplication");
                 });
-                check("Preferences persist locally and external command paths are quoted without launching", () => {
-                    var keys = new[] {"D9speed_Common_UseCustomUiFont", "D9speed_Common_UiFontAssetPath", "D9speed_Core_ShowPrefabOverrideIcon", "D9speed_Core_AutoHotkeyExecutablePath", "D9speed_Core_SakuraGrepScriptPath"};
+                check("Font and hierarchy preferences persist locally", () => {
+                    var keys = new[] {"D9speed_Common_UseCustomUiFont", "D9speed_Common_UiFontAssetPath", "D9speed_Core_ShowPrefabOverrideIcon"};
                     var exists = keys.ToDictionary(k => k, EditorPrefs.HasKey);
                     var old_strings = keys.ToDictionary(k => k, k => EditorPrefs.GetString(k, ""));
                     var old_font = D9speedCommonEditorPrefs.UseCustomUiFont;
@@ -145,11 +145,6 @@ namespace D9speed.PackageValidation
                         Require(D9speedEditorFontUtility.GetConfiguredFont() == null, "Standard font fallback");
                         D9speedCommonEditorPrefs.ShowPrefabOverrideIcon = false;
                         Require(!EditorPrefs.GetBool(keys[2], true), "Icon preference persistence");
-                        var executable = Path.GetFullPath(fixture + "/fake executable.exe"); File.WriteAllText(executable, "test only");
-                        var script = Path.GetFullPath(fixture + "/grep script.ahk"); File.WriteAllText(script, "test only");
-                        D9speedCommonEditorPrefs.AutoHotkeyExecutablePath = executable; D9speedCommonEditorPrefs.SakuraGrepScriptPath = script;
-                        var info = (System.Diagnostics.ProcessStartInfo)Call("EditorExternalTools", "CreateStartInfo", Path.GetFullPath(fixture));
-                        Require(info.FileName == executable && !info.UseShellExecute && info.Arguments == "\"" + script + "\" \"" + Path.GetFullPath(fixture) + "\"", "External command quoting");
                     } finally {
                         foreach (var key in keys) { if (!exists[key]) EditorPrefs.DeleteKey(key); else if (key == keys[0]) EditorPrefs.SetBool(key, old_font); else if (key == keys[2]) EditorPrefs.SetBool(key, old_icon); else EditorPrefs.SetString(key, old_strings[key]); }
                     }

@@ -15,7 +15,6 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 |---|---|
 | Projectの右クリック → `CopyFullPath` | ファイル・フォルダのフルパスをコピー。複数選択とPackages内の実体パスに対応 |
 | Projectの右クリック → `CopyAssetsWithDependency` | 選択したアセット群／フォルダを複製し、複製対象どうしの参照をコピー先へ変更 |
-| Projectの右クリック → `SakuraEditor_With_Grep` | 選択したアセットのパスを、設定したAutoHotkeyスクリプトへ渡す |
 | Hierarchyの右クリック → `Copy Animation Property Path` | 最も近いAnimatorを基準にしたパスをコピー。なければPrefabルート、シーンルートを使用 |
 | Hierarchyの右クリック → `このヒエラルキー配下を検索` | 選択階層のパスをUnity Searchで検索 |
 | Componentの右クリック → `コンポーネント名をコピー` | コンポーネントの型名をコピー |
@@ -36,9 +35,8 @@ Transform Resetの割り当てはUnityのShortcutsにある`Custom/ShortCutEX/Tr
 
 - 共通フォントの指定・解除。未指定時はUnity標準フォント。
 - Prefab変更マークの表示切り替え。
-- Windows向けサクラエディタ連携のAutoHotkey本体・Grep用AHKスクリプトのパス。
 
-設定は利用者のローカルEditorPrefsへ保存します。フォントの既存キーを維持しているため、更新後も設定を引き継ぎます。外部ツールのパスは初期状態では空です。AutoHotkey・サクラエディタ・AHKスクリプトは同梱しません。未公開のカメラ拡張、HTTP制御、Discord通知・認証情報はCoreに含めません。
+設定は利用者のローカルEditorPrefsへ保存します。フォントの既存キーを維持しているため、更新後も設定を引き継ぎます。未公開のカメラ拡張、HTTP制御、Discord通知・認証情報はCoreに含めません。
 
 ## 導入
 

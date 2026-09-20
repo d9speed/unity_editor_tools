@@ -1,7 +1,7 @@
 {
   "name": "io.github.d9speed.editor_core",
   "displayName": "D9speed Editor Core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "description": "Shared Editor helpers, asset and hierarchy context utilities, Transform tools, and preferences for D9speed tools.",
@@ -9,5 +9,5 @@
   "license": "MIT",
   "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.editor_core",
   "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.editor_core/CHANGELOG.md",
-  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/editor_core_v0.1.2/io.github.d9speed.editor_core-0.1.2.zip"
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/editor_core_v0.1.3/io.github.d9speed.editor_core-0.1.3.zip"
 }
