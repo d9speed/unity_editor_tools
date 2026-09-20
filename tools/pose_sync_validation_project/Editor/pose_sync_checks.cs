@@ -34,10 +34,13 @@ namespace D9speed.PackageValidation
                 Require(player.Any(a => a.name == "D9speed.PoseSync.Runtime"), "Runtime missing");
                 Require(!player.Any(a => a.name == "D9speed.PoseSync.Editor" || a.name == "D9speed.PoseSync.NDMF.Editor"), "Editor leaked");
                 var runtime = typeof(PoseSyncManager).Assembly.GetReferencedAssemblies();
-                Require(!runtime.Any(a => a.Name.StartsWith("MessagePack")), "External MessagePack dependency");
+                Require(runtime.Any(a => a.Name == "MessagePack"), "Official MessagePack dependency missing");
+                foreach (var dto in typeof(PoseSyncManager).Assembly.GetTypes().Where(t => t.GetCustomAttributes(typeof(MessagePack.MessagePackObjectAttribute), false).Length > 0))
+                    Require(typeof(PoseSyncGeneratedResolver).GetMethod("GetFormatter").MakeGenericMethod(dto).Invoke(PoseSyncGeneratedResolver.Instance, null) != null, "Generated formatter missing: " + dto.Name);
             });
             check("All three menus open and bundled Blender receiver resolves", () => {
-                foreach (var menu in new [] { "Pose Sync Setup", "Pose Sync Manager", "Send Pose Snapshot to Blender" })
+                Require(EditorApplication.ExecuteMenuItem("D9speed/Animations/PoseSync Setup"), "PoseSync Setup");
+                foreach (var menu in new [] { "Pose Sync Manager", "Send Pose Snapshot to Blender" })
                     Require(EditorApplication.ExecuteMenuItem("D9speed/Animation/" + menu), menu);
                 Require(File.Exists(PoseSyncSetupWindow.ReceiverPath), "Receiver missing");
                 foreach (var window in Resources.FindObjectsOfTypeAll<EditorWindow>().Where(w => w.GetType().Namespace?.StartsWith("UnityBlenderPoseSync") == true)) window.Close();

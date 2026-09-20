@@ -1,0 +1,21 @@
+{
+  "name": "D9speed.PoseSync.NuGet.Editor",
+  "references": [
+    "D9speed.PoseSync.Setup",
+    "NuGetForUnity"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "D9SPEED_POSESYNC_NUGET"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.github-glitchenzo.nugetforunity",
+      "expression": "[4.5.0,4.6.0)",
+      "define": "D9SPEED_POSESYNC_NUGET"
+    }
+  ]
+}

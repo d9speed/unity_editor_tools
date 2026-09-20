@@ -9,7 +9,8 @@
   ],
   "autoReferenced": true,
   "defineConstraints": [
-    "D9SPEED_POSESYNC_NDMF"
+    "D9SPEED_POSESYNC_NDMF",
+    "POSESYNC_HAS_MESSAGEPACK"
   ],
   "versionDefines": [
     {

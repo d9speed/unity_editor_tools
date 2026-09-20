@@ -1,3 +1,4 @@
+using MessagePack;
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
@@ -862,49 +863,54 @@ namespace UnityBlenderPoseSync.World
         [Tooltip("The final (post-build) Transform whose live world rotation is read each frame.")]
         public Transform transform;
     }
+    [MessagePackObject]
     public sealed class WorldPoseFrameMessage
     {
-        public string schema = "unity_blender_pose_sync.world";
-        public int version = 2;
-        public string message_type = "pose";
-        public string avatar_name = "";
-        public long frame;
-        public double unity_time;
-        public bool send_position;
-        public WorldTransformMsg root_world = new WorldTransformMsg();
-        public WorldTransformMsg hips_world = new WorldTransformMsg();
-        public WorldBoneMessage[] bones = Array.Empty<WorldBoneMessage>();
+        [Key("schema")] public string schema = "unity_blender_pose_sync.world";
+        [Key("version")] public int version = 2;
+        [Key("message_type")] public string message_type = "pose";
+        [Key("avatar_name")] public string avatar_name = "";
+        [Key("frame")] public long frame;
+        [Key("unity_time")] public double unity_time;
+        [Key("send_position")] public bool send_position;
+        [Key("root_world")] public WorldTransformMsg root_world = new WorldTransformMsg();
+        [Key("hips_world")] public WorldTransformMsg hips_world = new WorldTransformMsg();
+        [Key("bones")] public WorldBoneMessage[] bones = Array.Empty<WorldBoneMessage>();
     }
+    [MessagePackObject]
     public sealed class WorldPoseStateMessage
     {
-        public string schema = "unity_blender_pose_sync.world";
-        public int version = 2;
-        public string message_type = "state";
-        public string state = "";
-        public string avatar_name = "";
-        public long frame;
-        public double unity_time;
+        [Key("schema")] public string schema = "unity_blender_pose_sync.world";
+        [Key("version")] public int version = 2;
+        [Key("message_type")] public string message_type = "state";
+        [Key("state")] public string state = "";
+        [Key("avatar_name")] public string avatar_name = "";
+        [Key("frame")] public long frame;
+        [Key("unity_time")] public double unity_time;
     }
+    [MessagePackObject]
     public sealed class WorldBoneMessage
     {
-        public string key = "";
-        public string target = "";
-        public string human_bone;            // null for non-Humanoid bones
-        public WorldQuat rest_rotation = new WorldQuat();
-        public WorldQuat rotation = new WorldQuat();
-        public WorldVec3 rest_position;   // null unless send_position
-        public WorldVec3 position;             // null unless send_position
+        [Key("key")] public string key = "";
+        [Key("target")] public string target = "";
+        [Key("human_bone")] public string human_bone;            // null for non-Humanoid bones
+        [Key("rest_rotation")] public WorldQuat rest_rotation = new WorldQuat();
+        [Key("rotation")] public WorldQuat rotation = new WorldQuat();
+        [Key("rest_position")] public WorldVec3 rest_position;   // null unless send_position
+        [Key("position")] public WorldVec3 position;             // null unless send_position
     }
+    [MessagePackObject]
     public sealed class WorldTransformMsg
     {
-        public WorldVec3 position = new WorldVec3();
-        public WorldQuat rotation = new WorldQuat();
+        [Key("position")] public WorldVec3 position = new WorldVec3();
+        [Key("rotation")] public WorldQuat rotation = new WorldQuat();
     }
+    [MessagePackObject]
     public sealed class WorldVec3
     {
-        public float x;
-        public float y;
-        public float z;
+        [Key("x")] public float x;
+        [Key("y")] public float y;
+        [Key("z")] public float z;
 
         public void Set(Vector3 value)
         {
@@ -913,12 +919,13 @@ namespace UnityBlenderPoseSync.World
             z = value.z;
         }
     }
+    [MessagePackObject]
     public sealed class WorldQuat
     {
-        public float x;
-        public float y;
-        public float z;
-        public float w = 1.0f;
+        [Key("x")] public float x;
+        [Key("y")] public float y;
+        [Key("z")] public float z;
+        [Key("w")] public float w = 1.0f;
 
         public void Set(Quaternion value)
         {

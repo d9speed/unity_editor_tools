@@ -6,5 +6,8 @@
   "includePlatforms": [
     "Editor"
   ],
-  "autoReferenced": true
+  "autoReferenced": true,
+  "defineConstraints": [
+    "POSESYNC_HAS_MESSAGEPACK"
+  ]
 }

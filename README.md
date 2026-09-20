@@ -26,7 +26,7 @@ Unity Editor拡張を、機能ごとのVPMパッケージとして管理しま�
 
 Screen Texture CaptureはWindows Editor専用で、FFmpeg実行ファイルは同梱しません。Cloth Fitting ToolsにはVRChat Avatars SDK 3.10.3以上・3.11.0未満が必要です。SDKは公式リポジトリから依存として導入されます。
 
-Unity Blender Pose SyncはRuntimeとEditorを1パッケージで導入できます。MessagePackやNuGetの追加導入は不要です。Blender用アドオンはUnityの`D9speed / Animation / Pose Sync Setup`から場所を開き、Blender側へインストールしてください。詳細は[使い方](packages/io.github.d9speed.unity_blender_pose_sync/README.md)と[検証記録](docs/pose_sync_validation_report.md)を参照してください。
+Unity Blender Pose SyncはRuntimeとEditorを1パッケージで導入できます。Unityの`D9speed / Animations / PoseSync Setup`で「セットアップ」を押すと、NuGetForUnityと公式MessagePackを導入し、完了項目を緑のチェックで表示します。同じ画面からBlender用アドオンの場所を開き、Blender側へインストールしてください。詳細は[使い方](packages/io.github.d9speed.unity_blender_pose_sync/README.md)と[検証記録](docs/pose_sync_nuget_validation_report.md)を参照してください。
 
 Unity 2022.3.22f1で検証しています。旧Assets版と同時に入れるとGUIDやアセンブリが重複するため、新規プロジェクトでの導入を推奨します。旧ファイルの自動削除は行いません。
 

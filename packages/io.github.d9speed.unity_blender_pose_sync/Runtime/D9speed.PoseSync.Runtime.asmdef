@@ -2,5 +2,8 @@
   "name": "D9speed.PoseSync.Runtime",
   "references": [],
   "includePlatforms": [],
-  "autoReferenced": true
+  "autoReferenced": true,
+  "defineConstraints": [
+    "POSESYNC_HAS_MESSAGEPACK"
+  ]
 }

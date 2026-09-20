@@ -1,3 +1,4 @@
+using MessagePack;
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
@@ -1119,11 +1120,12 @@ namespace UnityBlenderPoseSync.World
 #endif
         }
     }
+    [MessagePackObject]
     public sealed class PoseSyncCommand
     {
-        public string message_type = "command";
-        public string command = "";
-        public int frames = 1;
+        [Key("message_type")] public string message_type = "command";
+        [Key("command")] public string command = "";
+        [Key("frames")] public int frames = 1;
     }
 
     // ---- schema v3 wire messages ----
@@ -1135,65 +1137,72 @@ namespace UnityBlenderPoseSync.World
     /// configured. Lets the Blender panel build its slots before Play Mode ever runs.
     /// Carries no bone data - that only exists once Play Mode binds the rigs.
     /// </summary>
+    [MessagePackObject]
     public sealed class AvatarListMessage
     {
-        public string schema = "";
-        public int version = 3;
-        public string message_type = "avatar_list";
-        public string[] avatars = Array.Empty<string>();
+        [Key("schema")] public string schema = "";
+        [Key("version")] public int version = 3;
+        [Key("message_type")] public string message_type = "avatar_list";
+        [Key("avatars")] public string[] avatars = Array.Empty<string>();
     }
+    [MessagePackObject]
     public sealed class AvatarDefsMessage
     {
-        public string schema = "";
-        public int version = 3;
-        public string message_type = "avatar_defs";
-        public AvatarDefEntry[] avatars = Array.Empty<AvatarDefEntry>();
+        [Key("schema")] public string schema = "";
+        [Key("version")] public int version = 3;
+        [Key("message_type")] public string message_type = "avatar_defs";
+        [Key("avatars")] public AvatarDefEntry[] avatars = Array.Empty<AvatarDefEntry>();
     }
+    [MessagePackObject]
     public sealed class AvatarDefEntry
     {
-        public string avatar_name = "";
-        public string[] targets = Array.Empty<string>();
-        public string[] human_bones = Array.Empty<string>();
-        public byte[] rest_rotations = Array.Empty<byte>();
+        [Key("avatar_name")] public string avatar_name = "";
+        [Key("targets")] public string[] targets = Array.Empty<string>();
+        [Key("human_bones")] public string[] human_bones = Array.Empty<string>();
+        [Key("rest_rotations")] public byte[] rest_rotations = Array.Empty<byte>();
     }
+    [MessagePackObject]
     public sealed class PoseFrameV3
     {
-        public string schema = "";
-        public int version = 3;
-        public string message_type = "pose";
-        public long frame;
-        public double unity_time;
-        public AvatarPoseEntry[] avatars = Array.Empty<AvatarPoseEntry>();
-        public CameraPoseV3 camera;
+        [Key("schema")] public string schema = "";
+        [Key("version")] public int version = 3;
+        [Key("message_type")] public string message_type = "pose";
+        [Key("frame")] public long frame;
+        [Key("unity_time")] public double unity_time;
+        [Key("avatars")] public AvatarPoseEntry[] avatars = Array.Empty<AvatarPoseEntry>();
+        [Key("camera")] public CameraPoseV3 camera;
     }
+    [MessagePackObject]
     public sealed class CameraPoseV3
     {
-        public string camera_name = "";
-        public byte[] transform = Array.Empty<byte>();
-        public bool orthographic;
-        public float field_of_view = 60f;
-        public float orthographic_size = 5f;
-        public float aspect = 16f / 9f;
-        public float near_clip = 0.01f;
-        public float far_clip = 1000f;
-        public bool scene_view;
-        public byte[] view_pivot = new byte[3 * sizeof(float)];
-        public float view_distance;
-        public float view_size;
+        [Key("camera_name")] public string camera_name = "";
+        [Key("transform")] public byte[] transform = Array.Empty<byte>();
+        [Key("orthographic")] public bool orthographic;
+        [Key("field_of_view")] public float field_of_view = 60f;
+        [Key("orthographic_size")] public float orthographic_size = 5f;
+        [Key("aspect")] public float aspect = 16f / 9f;
+        [Key("near_clip")] public float near_clip = 0.01f;
+        [Key("far_clip")] public float far_clip = 1000f;
+        [Key("scene_view")] public bool scene_view;
+        [Key("view_pivot")] public byte[] view_pivot = new byte[3 * sizeof(float)];
+        [Key("view_distance")] public float view_distance;
+        [Key("view_size")] public float view_size;
     }
+    [MessagePackObject]
     public sealed class AvatarPoseEntry
     {
-        public string avatar_name = "";
-        public byte[] root = Array.Empty<byte>();
-        public byte[] hips = Array.Empty<byte>();
-        public byte[] rotations = Array.Empty<byte>();
+        [Key("avatar_name")] public string avatar_name = "";
+        [Key("root")] public byte[] root = Array.Empty<byte>();
+        [Key("hips")] public byte[] hips = Array.Empty<byte>();
+        [Key("rotations")] public byte[] rotations = Array.Empty<byte>();
     }
+    [MessagePackObject]
     public sealed class PoseStateV3
     {
-        public string schema = "";
-        public int version = 3;
-        public string message_type = "state";
-        public string state = "";
-        public long frame;
+        [Key("schema")] public string schema = "";
+        [Key("version")] public int version = 3;
+        [Key("message_type")] public string message_type = "state";
+        [Key("state")] public string state = "";
+        [Key("frame")] public long frame;
     }
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 - 2026-09-20
+
+- 独自MessagePack実装を公式NuGet版3.1.9へ置き換え、Source Generatorで通信DTOを処理。
+- `D9speed / Animations / PoseSync Setup`へ導入画面を統一し、従来の緑チェックと進捗ボックスを継承。
+- NuGetForUnity・MessagePackとその依存関係・MessagePack.Unityのセットアップを追加。
+- コンパイル後も導入を継続し、依存関係が揃ってからRuntime・Editorを有効化。
+
 ## 0.1.0 - 2026-09-20
 
 - RuntimeとEditorを分離したVPMパッケージとして初公開。
