@@ -39,7 +39,7 @@ namespace D9speed.PackageValidation
             {
                 var packages = PackageInfo.GetAllRegisteredPackages();
                 foreach (var suffix in new[] { "editor_core", "scene_tools", "humanoid_alias_copy", "package_exporter", "rename_tool" })
-                    Require(packages.Any(p => p.name == "io.github.d9speed." + suffix && p.version == (suffix == "editor_core" ? "0.1.1" : "0.1.0")), "Missing package: " + suffix);
+                    Require(packages.Any(p => p.name == "io.github.d9speed." + suffix && p.version == (suffix == "editor_core" || suffix == "package_exporter" ? "0.1.1" : "0.1.0")), "Missing package: " + suffix);
                 Require(packages.Any(p => p.name == "com.unity.nuget.newtonsoft-json" && p.version == "3.2.1"), "Newtonsoft dependency");
                 Require(!packages.Any(p => p.name.StartsWith("com.vrchat.") || p.name.StartsWith("nadena.dev.")),
                     "This smoke test must run without optional VRChat packages.");
@@ -115,6 +115,7 @@ namespace D9speed.PackageValidation
                 finally { Object.DestroyImmediate(mesh); }
             });
             ToolsSmokeChecks.Run(check);
+            ExporterCompareSmokeChecks.Run(check);
             report.passed = report.checks.All(c => c.passed);
             Directory.CreateDirectory("Logs");
             File.WriteAllText("Logs/package_smoke_results.json", JsonUtility.ToJson(report, true));

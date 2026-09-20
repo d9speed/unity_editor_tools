@@ -240,7 +240,7 @@ public class PackageExporter : EditorWindow
         public float z = 0f;
     }
 
-    [MenuItem("D9speed/ExportBatch")]
+    [MenuItem("D9speed/ExportBatch/ExportBatch", false, 100)]
     public static void ShowWindow()
     {
         GetWindow<PackageExporter>("PackageExporter");

@@ -1,18 +1,33 @@
 # D9speed Package Exporter
 
-選択したフォルダをまとめて`.unitypackage`へ書き出すバッチエクスポーターです。除外設定、ファイル名の組み立て、設定のJSON保存・読み込み、コンポーネント情報のJSON出力に対応します。
+選択したフォルダをまとめて`.unitypackage`へ書き出すバッチエクスポーターと、書き出したコンポーネント情報JSONの比較ツールを同梱しています。
 
-## 導入と使用
+## 導入
 
 [案内ページ](https://d9speed.github.io/Unity_Tools/)からVCC / ALCOMに登録し、`D9speed Package Exporter`を導入してください。
 
-1. Unityの`D9speed > ExportBatch`を開きます。
+本体と比較ツールは同時に導入・更新されます。Unityの`D9speed > ExportBatch`に両方のメニューが並びます。
+
+## ExportBatch
+
+除外設定、ファイル名の組み立て、設定のJSON保存・読み込み、コンポーネント情報のJSON出力に対応します。
+
+1. Unityの`D9speed > ExportBatch > ExportBatch`を開きます。
 2. 対象フォルダ、出力先、パッケージ名と日付書式を指定します。
 3. 書き出すサブフォルダと除外条件を確認し、実行します。
 
 設定は各プロジェクトの`ProjectSettings/PackageExporterSettings.asset`に保存します。JSONプロファイルも任意の保存先で管理できます。配布パッケージの中に個人の出力先やプロファイルは含めていません。
 
 Tablacus Explorerで出力先を開く機能は任意です。有効にする場合は実行ファイルを自分で指定してください。実行ファイルは同梱しません。公開版はDiscord通知を行いません。
+
+## Package Component Report Compare
+
+1. `D9speed > ExportBatch > Package Component Report Compare`を開きます。
+2. `Reference JSON`に基準となる`*_components.json`を指定します。
+3. `Add Target`で比較対象のレポートを追加します。複数のレポートを並べて比較できます。
+4. 欠落（Missing）、追加（Extra）、個数の違い（Count Diff）、配置の違い（Location Diff）を確認します。`差分のみ`や`Filter`で絞り込めます。
+
+このツールはレポートを読み取って比較します。Prefabやコンポーネントを変更しません。コンポーネント内部の設定値の差分比較は対象外です。
 
 ## 依存関係・動作環境
 

@@ -9,7 +9,7 @@ Unity Editor拡張を、機能ごとのVPMパッケージとして管理しま�
 | `io.github.d9speed.editor_core` | 各ツールに必要な共通ヘルパー |
 | `io.github.d9speed.scene_tools` | Display Child Names、Package / Prefab Info |
 | `io.github.d9speed.humanoid_alias_copy` | ボーン名の辞書を使ったコンポーネントコピー。辞書JSON同梱 |
-| `io.github.d9speed.package_exporter` | unitypackageのバッチ書き出し、JSONプロファイルと情報出力 |
+| `io.github.d9speed.package_exporter` | unitypackageのバッチ書き出し、JSONプロファイルと情報出力・比較 |
 | `io.github.d9speed.rename_tool` | アセット・Hierarchy・Animatorの名称の一括置換 |
 
 ## 導入
