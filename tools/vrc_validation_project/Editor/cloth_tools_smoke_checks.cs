@@ -18,7 +18,7 @@ namespace D9speed.PackageValidation
     public static class ClothToolsSmokeChecks
     {
         [Serializable] private sealed class Check { public string name; public bool passed; public string detail; }
-        [Serializable] private sealed class Report { public bool passed; public string unity_version; public List<Check> checks = new List<Check>(); }
+        [Serializable] private sealed class Report { public bool passed; public string unity_version; public string sdk_version; public List<Check> checks = new List<Check>(); }
         private const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
         public static void Run()
         {
@@ -27,10 +27,14 @@ namespace D9speed.PackageValidation
                 try { action(); report.checks.Add(new Check { name = name, passed = true, detail = "passed" }); }
                 catch (Exception error) { report.checks.Add(new Check { name = name, passed = false, detail = error.ToString() }); Debug.LogError(name + ": " + error); }
             };
-            check("Ten D9speed packages coexist with SDK 3.10.3 and remain Editor-only", () => {
+            check("Ten D9speed packages coexist with the expected SDK and remain Editor-only", () => {
                 var packages = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages();
                 require(packages.Count(p => p.name.StartsWith("io.github.d9speed.")) == 10, "D9speed package count");
-                require(packages.Any(p => p.name == "com.vrchat.avatars" && p.version == "3.10.3"), "SDK version");
+                var args = Environment.GetCommandLineArgs();
+                var expected_index = Array.IndexOf(args, "-d9speedExpectedSdkVersion");
+                var expected = expected_index >= 0 ? args[expected_index + 1] : "3.10.3";
+                report.sdk_version = packages.Single(p => p.name == "com.vrchat.avatars").version;
+                require(report.sdk_version == expected, "SDK version");
                 require(!CompilationPipeline.GetAssemblies(AssembliesType.Player).Any(a => a.name.StartsWith("D9speed.")), "Player assembly leak");
             });
             check("Both cloth fitting menus open", () => {

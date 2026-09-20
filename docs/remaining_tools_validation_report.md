@@ -32,17 +32,21 @@ Unityプロジェクト本体から必要なソースとメタファイルをコ
 
 ## VRChat SDK入りの検証
 
-別の新規プロジェクト`vrc_tools_validation`へ、vrc-get 1.9.2で公式VRChat Avatars SDK 3.10.3を取得しました。公開対象10パッケージを同時に入れ、次の4項目が成功しました。
+別の新規プロジェクト`vrc_tools_validation`へ、vrc-get 1.9.2で公式VRChat Avatars SDKを取得しました。公開対象10パッケージを同時に入れ、SDK 3.10.3と3.10.5のそれぞれで次の4項目が成功し、Unityは終了コード0で終了しました。3.10.5は公開リポジトリからの導入時に自動解決されたバージョンです。
 
-- 10パッケージとSDK 3.10.3が共存し、D9speedのコードがEditor専用であること。
+- 10パッケージと指定したSDKバージョンが共存し、D9speedのコードがEditor専用であること。
 - 衣装調整の両メニューを開けること。
 - 合成したウェイト付きメッシュから、対象ボーン・寸法が正しいカプセルコライダーを作成し、Undoで戻せること。
 - ProxyにRotation / Parent Constraintを作成し、参照先・正規化されたウェイト・元の位置が維持されること。
 
-実行処理は`tools/vrc_validation_project/Editor`、結果は検証プロジェクトの`Logs/cloth_tools_smoke_results.json`です。
+実行処理は`tools/vrc_validation_project/Editor`、結果は検証プロジェクトの`Logs/cloth_tools_smoke_results.json`です。SDKの期待値は実行引数`-d9speedExpectedSdkVersion`で指定でき、省略時は3.10.3です。
 
 ## 配布と確認範囲
 
-配布ZIPは`artifacts/remaining_tools_20260920`に生成し、内容とハッシュを照合します。SDKとFFmpegの本体、既存プロジェクトの個人設定、利用者のアバターは含めません。依存の宣言は[VPM公式仕様](https://vcc.docs.vrchat.com/vpm/packages/)に従い、SDKの対応範囲を指定します。
+配布ZIPは`artifacts/remaining_tools_20260920`に生成し、収録73ファイルを元のパッケージと照合しました。公開した5個のZIPは認証なしで再取得し、VPM一覧のSHA-256と一致することを確認しました。SDKとFFmpegの本体、既存プロジェクトの個人設定、利用者のアバターは含めません。依存の宣言は[VPM公式仕様](https://vcc.docs.vrchat.com/vpm/packages/)に従い、SDKの対応範囲を指定しています。
+
+通常のALCOM設定とは分離したvrc-get 1.9.2の環境で、[公開VPM一覧](https://d9speed.github.io/Unity_Tools/index.json)から追加5パッケージを導入しました。既存分を含む公開10パッケージが入り、Cloth Fitting Toolsの依存として公式SDK 3.10.5が自動導入されました。導入されたD9speedパッケージの163ファイルが公開元と一致しています。ALCOM画面上での操作は今回の確認範囲に含みません。
+
+案内ページは10パッケージを掲載し、幅1200pxと390pxで横方向にはみ出さないことを確認しました。
 
 実アバターごとの動作、VRChatへのアップロード、Play Modeでの長時間利用、Unity 6は未検証です。Screen Texture Captureの実画面取得・範囲選択・速度は今回の自動確認に含みません。FFmpegの[gdigrab](https://ffmpeg.org/ffmpeg-devices.html#gdigrab)と[ddagrab](https://ffmpeg.org/ffmpeg-filters.html#ddagrab)の対応状況は利用するビルドと環境に依存します。
