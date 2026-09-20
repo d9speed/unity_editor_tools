@@ -1,7 +1,7 @@
 {
   "name": "io.github.d9speed.rename_tool",
   "displayName": "D9speed Rename Tool",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "description": "Preview and batch-rename assets, hierarchy objects, and Animator names.",
@@ -12,9 +12,9 @@
   },
   "license": "MIT",
   "vpmDependencies": {
-    "io.github.d9speed.editor_core": ">=0.1.1 <0.2.0"
+    "io.github.d9speed.editor_core": ">=0.1.5 <0.2.0"
   },
   "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.rename_tool",
   "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.rename_tool/CHANGELOG.md",
-  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/rename_tool_v0.1.0/io.github.d9speed.rename_tool-0.1.0.zip"
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/rename_tool_v0.1.1/io.github.d9speed.rename_tool-0.1.1.zip"
 }

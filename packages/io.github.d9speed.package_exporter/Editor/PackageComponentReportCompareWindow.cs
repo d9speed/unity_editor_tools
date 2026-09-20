@@ -5,36 +5,18 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
+using D9speed_BaseEditorUtils;
 
 namespace D9speedBaseEditorUtil
 {
     public sealed class PackageComponentReportCompareWindow : EditorWindow
     {
         private const string menu_path = "D9speed/ExportBatch/Package Component Report Compare";
-        private const float row_height = 22f;
-        private const float header_height = 22f;
-        private const float resize_handle_width = 6f;
-
-        private static readonly Color header_color = new Color(0.20f, 0.20f, 0.20f, 1f);
-        private static readonly Color even_row_color = new Color(0.24f, 0.24f, 0.24f, 0.35f);
-        private static readonly Color odd_row_color = new Color(0.12f, 0.12f, 0.12f, 0.35f);
-        private static readonly Color selected_row_color = new Color(0.25f, 0.42f, 0.75f, 0.55f);
-        private static readonly Color diff_row_color = new Color(0.80f, 0.55f, 0.15f, 0.22f);
-        private static readonly Color location_diff_row_color = new Color(0.55f, 0.45f, 0.95f, 0.22f);
-        private static readonly Color missing_row_color = new Color(0.75f, 0.18f, 0.18f, 0.24f);
-        private static readonly Color extra_row_color = new Color(0.18f, 0.60f, 0.28f, 0.20f);
-        private static readonly Color normal_text_color = new Color(0.86f, 0.86f, 0.86f, 1f);
-        private static readonly Color diff_text_color = new Color(1.00f, 0.42f, 0.42f, 1f);
-        private static readonly Color extra_text_color = new Color(0.45f, 1.00f, 0.58f, 1f);
-        private static readonly Color location_diff_text_color = new Color(0.70f, 0.62f, 1.00f, 1f);
-
         [SerializeField] private string reference_json_path = "";
         [SerializeField] private List<string> target_json_paths = new List<string>();
         [SerializeField] private string filter_text = "";
         [SerializeField] private bool only_differences = false;
-        [SerializeField] private Vector2 table_scroll;
-        [SerializeField] private Vector2 detail_scroll;
-        [SerializeField] private Vector2 summary_scroll;
         [SerializeField] private int sort_column = 0;
         [SerializeField] private bool sort_descending = false;
         [SerializeField] private int selected_row = -1;
@@ -48,11 +30,13 @@ namespace D9speedBaseEditorUtil
         private List<CompareRow> rows = new List<CompareRow>();
         private List<CompareRow> visible_rows = new List<CompareRow>();
         private List<TableColumn> columns = new List<TableColumn>();
-        private GUIStyle header_style;
-        private GUIStyle cell_style;
-        private GUIStyle small_cell_style;
-        private GUIStyle summary_style;
-        private int resizing_column = -1;
+        private MultiColumnListView report_table;
+        private VisualElement paths_container;
+        private ScrollView summary_container;
+        private ScrollView detail_container;
+        private Label result_count;
+        private Label empty_state;
+        private bool rebuilding_table;
 
         [MenuItem(menu_path, false, 101)]
         public static void Open()
@@ -73,183 +57,257 @@ namespace D9speedBaseEditorUtil
             RebuildColumns();
         }
 
-        private void OnGUI()
+        private void CreateGUI()
         {
-            EnsureStyles();
-            DrawToolbar();
-            DrawSummary();
-            DrawTable();
-            DrawSelectedDetail();
+            var root = rootVisualElement;
+            root.Clear();
+            EditorUiTheme.Apply(root);
+            var sheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Packages/io.github.d9speed.package_exporter/Editor/report_compare.uss");
+            if (sheet != null && !root.styleSheets.Contains(sheet)) root.styleSheets.Add(sheet);
+            root.AddToClassList("report_compare");
+            minSize = new Vector2(760, 600);
+
+            var content = new VisualElement();
+            content.AddToClassList("d9_content");
+            content.AddToClassList("d9_grow");
+            content.AddToClassList("d9_window_body");
+            root.Add(content);
+            content.Add(EditorUiControls.Header("Component Report Compare", "出力レポートを比較し、コンポーネントの数と配置の違いを確認します。"));
+            var setup_scroll = new ScrollView(ScrollViewMode.Vertical);
+            setup_scroll.AddToClassList("report_setup");
+            content.Add(setup_scroll);
+            var setup = EditorUiControls.Section(setup_scroll, "比較するレポート");
+            var paths = new ScrollView(ScrollViewMode.Vertical);
+            paths.AddToClassList("report_paths");
+            paths_container = paths.contentContainer;
+            setup.Add(paths);
+            var actions = EditorUiControls.Row();
+            actions.Add(EditorUiControls.Button("比較対象を追加…", AddTargetJson, true));
+            actions.Add(EditorUiControls.Button("再読み込み", ReloadReports));
+            actions.Add(EditorUiControls.Button("クリア", () =>
+            {
+                reference_json_path = "";
+                target_json_paths.Clear();
+                ReloadReports();
+            }));
+            setup.Add(actions);
+
+            var summary = EditorUiControls.Foldout("レポートの概要");
+            summary.viewDataKey = "report_summary";
+            summary_container = new ScrollView(ScrollViewMode.VerticalAndHorizontal);
+            summary_container.AddToClassList("report_summary");
+            summary.Add(summary_container);
+            setup.Add(summary);
+
+            var filter_row = EditorUiControls.Row(false);
+            var filter = EditorUiControls.Field(new TextField("絞り込み（種類・名前・配置場所）") { value = filter_text, name = "report_filter" });
+            filter.RegisterValueChangedCallback(evt => { filter_text = evt.newValue; RefreshTable(); });
+            filter_row.Add(filter);
+            filter_row.Add(EditorUiControls.Toggle("差分のみ", only_differences, value => { only_differences = value; RefreshTable(); }));
+            content.Add(filter_row);
+            result_count = EditorUiControls.Label("");
+            content.Add(result_count);
+
+            var table_container = new VisualElement();
+            table_container.AddToClassList("d9_grow");
+            table_container.AddToClassList("d9_table_container");
+            report_table = new MultiColumnListView
+            {
+                name = "report_table",
+                fixedItemHeight = 32,
+                selectionType = SelectionType.Single,
+                sortingEnabled = true,
+                reorderable = false
+            };
+            report_table.AddToClassList("d9_table");
+            report_table.columns.reorderable = false;
+            report_table.selectionChanged += selected =>
+            {
+                if (rebuilding_table) return;
+                var row = selected.OfType<CompareRow>().FirstOrDefault();
+                selected_row = row == null ? -1 : rows.IndexOf(row);
+                RefreshDetails();
+            };
+            report_table.columnSortingChanged += () =>
+            {
+                if (rebuilding_table) return;
+                var sorted = report_table.sortedColumns.FirstOrDefault();
+                if (sorted != null)
+                {
+                    sort_column = sorted.columnIndex;
+                    sort_descending = sorted.direction == SortDirection.Descending;
+                }
+                RefreshTable();
+            };
+            table_container.Add(report_table);
+            empty_state = EditorUiControls.Label("", "d9_empty_state");
+            empty_state.pickingMode = PickingMode.Ignore;
+            table_container.Add(empty_state);
+            content.Add(table_container);
+
+            var detail = EditorUiControls.Foldout("選択したコンポーネントの配置場所", true);
+            detail.AddToClassList("report_detail_foldout");
+            detail.viewDataKey = "report_details";
+            detail_container = new ScrollView(ScrollViewMode.VerticalAndHorizontal);
+            detail_container.AddToClassList("report_details");
+            detail.Add(detail_container);
+            content.Add(detail);
+            ReloadReports();
         }
 
-        private void DrawToolbar()
+        private void OnInspectorUpdate()
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                DrawPathRow("Reference JSON", reference_json_path, SelectReferenceJson);
-
-                for (int i = 0; i < target_json_paths.Count; i++)
-                {
-                    int index = i;
-                    DrawTargetPathRow(index);
-                }
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    filter_text = EditorGUILayout.TextField("Filter", filter_text);
-                    only_differences = EditorGUILayout.ToggleLeft("差分のみ", only_differences, GUILayout.Width(90f));
-
-                    if (GUILayout.Button("Add Target", GUILayout.Width(100f)))
-                    {
-                        AddTargetJson();
-                    }
-
-                    if (GUILayout.Button("Reload", GUILayout.Width(90f)))
-                    {
-                        ReloadReports();
-                    }
-
-                    if (GUILayout.Button("Clear", GUILayout.Width(70f)))
-                    {
-                        reference_json_path = "";
-                        target_json_paths.Clear();
-                        reference_report = new PackageReport();
-                        target_reports.Clear();
-                        rows.Clear();
-                        visible_rows.Clear();
-                        selected_row = -1;
-                    }
-                }
-            }
+            EditorUiTheme.RefreshTheme(rootVisualElement);
         }
 
-        private void DrawPathRow(string label, string path, Action select_action)
+        private void OnDisable()
         {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField(label, GUILayout.Width(110f));
-                EditorGUILayout.SelectableLabel(path, EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
-                if (GUILayout.Button("Select", GUILayout.Width(70f)))
-                {
-                    select_action();
-                }
-            }
+            CaptureColumnWidths();
         }
 
-        private void DrawTargetPathRow(int index)
+        private void CaptureColumnWidths()
         {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("Target " + (index + 1) + " JSON", GUILayout.Width(110f));
-                EditorGUILayout.SelectableLabel(target_json_paths[index], EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
-                if (GUILayout.Button("Select", GUILayout.Width(70f)))
-                {
-                    SelectTargetJson(index);
-                }
+            if (report_table == null || column_widths == null) return;
+            for (int i = 0; i < Math.Min(report_table.columns.Count, column_widths.Length); i++)
+                column_widths[i] = report_table.columns[i].width.value;
+        }
 
-                if (GUILayout.Button("Remove", GUILayout.Width(70f)))
+        private void RefreshComparisonUI()
+        {
+            if (paths_container == null) return;
+            paths_container.Clear();
+            AddPathRow("基準 JSON", reference_json_path, SelectReferenceJson, null);
+            for (int i = 0; i < target_json_paths.Count; i++)
+            {
+                int index = i;
+                AddPathRow("比較対象 " + (i + 1), target_json_paths[i], () => SelectTargetJson(index), () =>
                 {
+                    CaptureColumnWidths();
                     target_json_paths.RemoveAt(index);
                     ReloadReports();
-                }
+                });
             }
-        }
+            summary_container.Clear();
+            var summaries = EditorUiControls.Row(false);
+            AddReportPane(summaries, "基準", reference_report);
+            for (int i = 0; i < target_reports.Count; i++) AddReportPane(summaries, "比較対象 " + (i + 1), target_reports[i]);
+            summary_container.Add(summaries);
 
-        private void DrawSummary()
-        {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Height(118f)))
-            {
-                summary_scroll = EditorGUILayout.BeginScrollView(summary_scroll, GUILayout.Height(108f));
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    DrawSummaryPane("Reference", reference_report);
-                    for (int i = 0; i < target_reports.Count; i++)
-                    {
-                        DrawSummaryPane("Target " + (i + 1), target_reports[i]);
-                    }
-                }
-                EditorGUILayout.EndScrollView();
-            }
-        }
-
-        private void DrawSummaryPane(string title, PackageReport report)
-        {
-            using (new EditorGUILayout.VerticalScope(GUILayout.Width(320f)))
-            {
-                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-                EditorGUILayout.LabelField(report.package_file, small_cell_style);
-                EditorGUILayout.TextArea(report.summary, summary_style, GUILayout.ExpandHeight(true));
-            }
-        }
-
-        private void DrawTable()
-        {
-            RebuildColumns();
-            UpdateVisibleRows();
-
-            Rect header_rect = GUILayoutUtility.GetRect(GetTableWidth(), header_height, GUILayout.ExpandWidth(false));
-            DrawHeader(header_rect);
-
-            table_scroll = EditorGUILayout.BeginScrollView(table_scroll, GUILayout.ExpandHeight(true));
-            float table_width = GetTableWidth();
-            Rect content_rect = GUILayoutUtility.GetRect(table_width, visible_rows.Count * row_height, GUILayout.ExpandWidth(false));
-
-            for (int i = 0; i < visible_rows.Count; i++)
-            {
-                Rect row_rect = new Rect(content_rect.x, content_rect.y + i * row_height, table_width, row_height);
-                DrawRow(row_rect, visible_rows[i], i);
-            }
-
-            EditorGUILayout.EndScrollView();
-        }
-
-        private void DrawHeader(Rect rect)
-        {
-            EditorGUI.DrawRect(rect, header_color);
-            float x = rect.x - table_scroll.x;
+            rebuilding_table = true;
+            report_table.columns.Clear();
             for (int i = 0; i < columns.Count; i++)
             {
-                Rect cell_rect = new Rect(x, rect.y, column_widths[i], rect.height);
-                string label = columns[i].label;
-                if (sort_column == i)
+                var descriptor = columns[i];
+                report_table.columns.Add(new Column
                 {
-                    label += sort_descending ? " ▼" : " ▲";
-                }
-
-                if (GUI.Button(cell_rect, label, header_style))
-                {
-                    if (sort_column == i)
+                    name = "column_" + i,
+                    title = descriptor.label,
+                    width = column_widths[i],
+                    minWidth = 60,
+                    resizable = true,
+                    sortable = true,
+                    makeCell = () => EditorUiControls.Label("", "d9_table_cell"),
+                    bindCell = (element, index) =>
                     {
-                        sort_descending = !sort_descending;
+                        if (index < 0 || index >= visible_rows.Count) return;
+                        var row = visible_rows[index];
+                        var label = (Label)element;
+                        label.text = GetCellText(row, descriptor);
+                        label.tooltip = label.text;
+                        var status = descriptor.target_index >= 0 ? GetTargetCell(row, descriptor.target_index).status : row.status;
+                        foreach (CompareStatus kind in Enum.GetValues(typeof(CompareStatus)))
+                            label.EnableInClassList("d9_status_" + kind.ToString().ToLowerInvariant(), kind == status && descriptor.kind != ColumnKind.Category);
                     }
-                    else
-                    {
-                        sort_column = i;
-                        sort_descending = false;
-                    }
-                }
-
-                DrawColumnResizeHandle(i, cell_rect);
-                x += column_widths[i];
+                });
             }
+            report_table.sortColumnDescriptions.Clear();
+            report_table.sortColumnDescriptions.Add(new SortColumnDescription(sort_column, sort_descending ? SortDirection.Descending : SortDirection.Ascending));
+            rebuilding_table = false;
+            RefreshTable();
+        }
+
+        private void AddPathRow(string title, string path, Action choose, Action remove)
+        {
+            var row = EditorUiControls.Row(false);
+            var field = EditorUiControls.Field(new TextField(title) { value = path, isReadOnly = true, tooltip = path });
+            row.Add(field);
+            row.Add(EditorUiControls.Button("参照…", choose));
+            if (remove != null) row.Add(EditorUiControls.Button("削除", remove));
+            paths_container.Add(row);
+        }
+
+        private void AddReportPane(VisualElement parent, string title, PackageReport report)
+        {
+            var pane = new VisualElement();
+            pane.AddToClassList("report_pane");
+            pane.Add(EditorUiControls.Label(title, "d9_section_title"));
+            pane.Add(EditorUiControls.Label(report.package_file));
+            var text = EditorUiControls.Label(string.IsNullOrEmpty(report.summary) ? "レポート未選択" : report.summary);
+            text.selection.isSelectable = true;
+            pane.Add(text);
+            parent.Add(pane);
+        }
+
+        private void RefreshTable()
+        {
+            UpdateVisibleRows();
+            if (report_table == null) return;
+            rebuilding_table = true;
+            report_table.itemsSource = visible_rows;
+            report_table.Rebuild();
+            int visible_index = selected_row >= 0 && selected_row < rows.Count ? visible_rows.IndexOf(rows[selected_row]) : -1;
+            report_table.SetSelectionWithoutNotify(visible_index < 0 ? Array.Empty<int>() : new[] { visible_index });
+            if (visible_index < 0) selected_row = -1;
+            rebuilding_table = false;
+            empty_state.text = rows.Count == 0 ? "基準と比較対象のコンポーネントレポート JSON を選択してください。" : "条件に一致するコンポーネントはありません。";
+            empty_state.EnableInClassList("d9_hidden", visible_rows.Count > 0);
+            result_count.text = $"{visible_rows.Count} / {rows.Count} 件を表示  ·  差分 {rows.Count(row => row.status != CompareStatus.Ok)} 件";
+            RefreshDetails();
+        }
+
+        private void RefreshDetails()
+        {
+            if (detail_container == null) return;
+            detail_container.Clear();
+            var row = selected_row >= 0 && selected_row < rows.Count ? rows[selected_row] : null;
+            if (row == null)
+            {
+                detail_container.Add(EditorUiControls.Label("表の行を選択すると、配置場所の一覧を表示します。"));
+                return;
+            }
+            var details = EditorUiControls.Row(false);
+            AddLocations(details, "基準", row.reference_locations);
+            for (int i = 0; i < row.targets.Count; i++) AddLocations(details, "比較対象 " + (i + 1), row.targets[i].locations);
+            detail_container.Add(details);
+        }
+
+        private void AddLocations(VisualElement parent, string title, List<string> locations)
+        {
+            var pane = new VisualElement();
+            pane.AddToClassList("report_pane");
+            pane.Add(EditorUiControls.Label($"{title}（{locations.Count}）", "d9_section_title"));
+            var text = EditorUiControls.Label(locations.Count == 0 ? "該当なし" : string.Join("\n", locations));
+            text.selection.isSelectable = true;
+            pane.Add(text);
+            parent.Add(pane);
         }
 
         private void RebuildColumns()
         {
             columns.Clear();
-            columns.Add(new TableColumn("Status", ColumnKind.Status, -1, 90f));
-            columns.Add(new TableColumn("Category", ColumnKind.Category, -1, 130f));
-            columns.Add(new TableColumn("Component", ColumnKind.Component, -1, 220f));
-            columns.Add(new TableColumn("Reference", ColumnKind.ReferenceCount, -1, 80f));
-            columns.Add(new TableColumn("Reference Locations", ColumnKind.ReferenceLocations, -1, 260f));
+            columns.Add(new TableColumn("状態", ColumnKind.Status, -1, 90f));
+            columns.Add(new TableColumn("種類", ColumnKind.Category, -1, 130f));
+            columns.Add(new TableColumn("コンポーネント", ColumnKind.Component, -1, 220f));
+            columns.Add(new TableColumn("基準数", ColumnKind.ReferenceCount, -1, 80f));
+            columns.Add(new TableColumn("基準の配置場所", ColumnKind.ReferenceLocations, -1, 260f));
 
             int target_count = Math.Max(target_json_paths.Count, target_reports.Count);
             for (int i = 0; i < target_count; i++)
             {
                 string target_label = GetTargetColumnLabel(i);
                 columns.Add(new TableColumn(target_label, ColumnKind.TargetCount, i, 100f));
-                columns.Add(new TableColumn("Delta " + (i + 1), ColumnKind.TargetDelta, i, 70f));
-                columns.Add(new TableColumn("Locations " + (i + 1), ColumnKind.TargetLocations, i, 260f));
+                columns.Add(new TableColumn("差分 " + (i + 1), ColumnKind.TargetDelta, i, 70f));
+                columns.Add(new TableColumn("配置場所 " + (i + 1), ColumnKind.TargetLocations, i, 260f));
             }
 
             EnsureColumnWidths();
@@ -262,7 +320,7 @@ namespace D9speedBaseEditorUtil
                 return "T" + (index + 1) + " " + target_reports[index].package_file;
             }
 
-            return "Target " + (index + 1);
+            return "比較対象 " + (index + 1);
         }
 
         private void EnsureColumnWidths()
@@ -283,76 +341,6 @@ namespace D9speedBaseEditorUtil
             sort_column = Mathf.Clamp(sort_column, 0, Math.Max(0, columns.Count - 1));
         }
 
-        private void DrawColumnResizeHandle(int column_index, Rect cell_rect)
-        {
-            Rect handle_rect = new Rect(cell_rect.xMax - resize_handle_width * 0.5f, cell_rect.y, resize_handle_width, cell_rect.height);
-            EditorGUIUtility.AddCursorRect(handle_rect, MouseCursor.ResizeHorizontal);
-
-            Event evt = Event.current;
-            if (evt.type == EventType.MouseDown && evt.button == 0 && handle_rect.Contains(evt.mousePosition))
-            {
-                resizing_column = column_index;
-                evt.Use();
-            }
-
-            if (resizing_column == column_index && evt.type == EventType.MouseDrag)
-            {
-                column_widths[column_index] = Mathf.Max(45f, evt.mousePosition.x - cell_rect.x);
-                Repaint();
-                evt.Use();
-            }
-
-            if (evt.type == EventType.MouseUp)
-            {
-                resizing_column = -1;
-            }
-        }
-
-        private void DrawRow(Rect row_rect, CompareRow row, int visible_index)
-        {
-            Color base_color = visible_index % 2 == 0 ? even_row_color : odd_row_color;
-            EditorGUI.DrawRect(row_rect, base_color);
-
-            if (row.status == CompareStatus.Missing)
-            {
-                EditorGUI.DrawRect(row_rect, missing_row_color);
-            }
-            else if (row.status == CompareStatus.Extra)
-            {
-                EditorGUI.DrawRect(row_rect, extra_row_color);
-            }
-            else if (row.status == CompareStatus.CountDiff)
-            {
-                EditorGUI.DrawRect(row_rect, diff_row_color);
-            }
-            else if (row.status == CompareStatus.LocationDiff)
-            {
-                EditorGUI.DrawRect(row_rect, location_diff_row_color);
-            }
-
-            int row_index = rows.IndexOf(row);
-            if (selected_row == row_index)
-            {
-                EditorGUI.DrawRect(row_rect, selected_row_color);
-            }
-
-            Event evt = Event.current;
-            if (evt.type == EventType.MouseDown && row_rect.Contains(evt.mousePosition))
-            {
-                selected_row = row_index;
-                Repaint();
-            }
-
-            float x = row_rect.x;
-            for (int i = 0; i < columns.Count; i++)
-            {
-                TableColumn column = columns[i];
-                Rect cell_rect = new Rect(x, row_rect.y, column_widths[i], row_rect.height);
-                DrawCell(cell_rect, GetCellText(row, column), GetCellTextColor(row, column));
-                x += column_widths[i];
-            }
-        }
-
         private string GetCellText(CompareRow row, TableColumn column)
         {
             TargetCompareCell target_cell = GetTargetCell(row, column.target_index);
@@ -370,41 +358,6 @@ namespace D9speedBaseEditorUtil
             }
         }
 
-        private Color GetCellTextColor(CompareRow row, TableColumn column)
-        {
-            if (column.kind == ColumnKind.Category)
-            {
-                return normal_text_color;
-            }
-
-            if (column.kind == ColumnKind.Status || column.kind == ColumnKind.Component)
-            {
-                return row.status == CompareStatus.Ok ? normal_text_color : GetStatusTextColor(row.status);
-            }
-
-            if (column.kind == ColumnKind.ReferenceCount)
-            {
-                return row.status == CompareStatus.CountDiff || row.status == CompareStatus.Missing || row.status == CompareStatus.Extra
-                    ? GetStatusTextColor(row.status)
-                    : normal_text_color;
-            }
-
-            if (column.kind == ColumnKind.ReferenceLocations)
-            {
-                return row.status == CompareStatus.LocationDiff ? GetStatusTextColor(row.status) : normal_text_color;
-            }
-
-            TargetCompareCell target_cell = GetTargetCell(row, column.target_index);
-            if (column.kind == ColumnKind.TargetLocations)
-            {
-                return target_cell.status == CompareStatus.LocationDiff ? GetStatusTextColor(target_cell.status) : normal_text_color;
-            }
-
-            return target_cell.status == CompareStatus.CountDiff || target_cell.status == CompareStatus.Missing || target_cell.status == CompareStatus.Extra
-                ? GetStatusTextColor(target_cell.status)
-                : normal_text_color;
-        }
-
         private TargetCompareCell GetTargetCell(CompareRow row, int target_index)
         {
             if (target_index >= 0 && target_index < row.targets.Count)
@@ -415,62 +368,9 @@ namespace D9speedBaseEditorUtil
             return TargetCompareCell.Empty;
         }
 
-        private void DrawCell(Rect rect, string text, Color text_color)
-        {
-            Rect padded_rect = new Rect(rect.x + 4f, rect.y + 2f, rect.width - 8f, rect.height - 4f);
-            Color old_color = cell_style.normal.textColor;
-            cell_style.normal.textColor = text_color;
-            GUI.Label(padded_rect, text, cell_style);
-            cell_style.normal.textColor = old_color;
-            EditorGUI.DrawRect(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), new Color(0.5f, 0.5f, 0.5f, 0.18f));
-        }
-
-        private void DrawSelectedDetail()
-        {
-            CompareRow row = selected_row >= 0 && selected_row < rows.Count ? rows[selected_row] : null;
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Height(150f)))
-            {
-                EditorGUILayout.LabelField("Selected Component Detail", EditorStyles.boldLabel);
-                if (row == null)
-                {
-                    EditorGUILayout.LabelField("行を選択してください。", small_cell_style);
-                    return;
-                }
-
-                detail_scroll = EditorGUILayout.BeginScrollView(detail_scroll);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    DrawLocationList("Reference", row.reference_locations);
-                    for (int i = 0; i < row.targets.Count; i++)
-                    {
-                        DrawLocationList("Target " + (i + 1), row.targets[i].locations);
-                    }
-                }
-                EditorGUILayout.EndScrollView();
-            }
-        }
-
-        private void DrawLocationList(string title, List<string> locations)
-        {
-            using (new EditorGUILayout.VerticalScope(GUILayout.Width(320f)))
-            {
-                EditorGUILayout.LabelField(title + " (" + locations.Count + ")", EditorStyles.boldLabel);
-                if (locations.Count == 0)
-                {
-                    EditorGUILayout.LabelField("-", small_cell_style);
-                    return;
-                }
-
-                foreach (string location in locations)
-                {
-                    EditorGUILayout.SelectableLabel(location, small_cell_style, GUILayout.Height(EditorGUIUtility.singleLineHeight));
-                }
-            }
-        }
-
         private void SelectReferenceJson()
         {
-            string selected_path = EditorUtility.OpenFilePanel("Reference component report JSON", GetInitialDirectory(reference_json_path), "json");
+            string selected_path = EditorUtility.OpenFilePanel("基準のコンポーネントレポート JSON", GetInitialDirectory(reference_json_path), "json");
             if (string.IsNullOrEmpty(selected_path)) return;
             reference_json_path = selected_path;
             ReloadReports();
@@ -478,7 +378,7 @@ namespace D9speedBaseEditorUtil
 
         private void AddTargetJson()
         {
-            string selected_path = EditorUtility.OpenFilePanel("Target component report JSON", GetInitialDirectory(GetLastTargetPath()), "json");
+            string selected_path = EditorUtility.OpenFilePanel("比較対象のコンポーネントレポート JSON", GetInitialDirectory(GetLastTargetPath()), "json");
             if (string.IsNullOrEmpty(selected_path)) return;
             target_json_paths.Add(selected_path);
             ReloadReports();
@@ -491,7 +391,7 @@ namespace D9speedBaseEditorUtil
                 return;
             }
 
-            string selected_path = EditorUtility.OpenFilePanel("Target component report JSON", GetInitialDirectory(target_json_paths[index]), "json");
+            string selected_path = EditorUtility.OpenFilePanel("比較対象のコンポーネントレポート JSON", GetInitialDirectory(target_json_paths[index]), "json");
             if (string.IsNullOrEmpty(selected_path)) return;
             target_json_paths[index] = selected_path;
             ReloadReports();
@@ -522,6 +422,7 @@ namespace D9speedBaseEditorUtil
 
         private void ReloadReports()
         {
+            CaptureColumnWidths();
             reference_report = LoadReport(reference_json_path);
             target_reports = target_json_paths.Select(LoadReport).ToList();
             rows = BuildCompareRows(reference_report, target_reports);
@@ -529,6 +430,7 @@ namespace D9speedBaseEditorUtil
             SortRows();
             RebuildColumns();
             UpdateVisibleRows();
+            RefreshComparisonUI();
         }
 
         private PackageReport LoadReport(string path)
@@ -731,26 +633,11 @@ namespace D9speedBaseEditorUtil
             switch (status)
             {
                 case CompareStatus.Ok: return "OK";
-                case CompareStatus.Missing: return "Missing";
-                case CompareStatus.Extra: return "Extra";
-                case CompareStatus.CountDiff: return "Count Diff";
-                case CompareStatus.LocationDiff: return "Location Diff";
+                case CompareStatus.Missing: return "不足";
+                case CompareStatus.Extra: return "追加";
+                case CompareStatus.CountDiff: return "個数差";
+                case CompareStatus.LocationDiff: return "配置差";
                 default: return status.ToString();
-            }
-        }
-
-        private Color GetStatusTextColor(CompareStatus status)
-        {
-            switch (status)
-            {
-                case CompareStatus.Ok: return normal_text_color;
-                case CompareStatus.Extra: return extra_text_color;
-                case CompareStatus.LocationDiff: return location_diff_text_color;
-                case CompareStatus.Missing:
-                case CompareStatus.CountDiff:
-                    return diff_text_color;
-                default:
-                    return normal_text_color;
             }
         }
 
@@ -858,38 +745,6 @@ namespace D9speedBaseEditorUtil
         private string ReadString(JToken token, string key)
         {
             return token?[key]?.Value<string>() ?? "";
-        }
-
-        private float GetTableWidth()
-        {
-            return column_widths.Sum();
-        }
-
-        private void EnsureStyles()
-        {
-            if (header_style != null) return;
-
-            header_style = new GUIStyle(EditorStyles.boldLabel)
-            {
-                alignment = TextAnchor.MiddleLeft,
-                clipping = TextClipping.Clip,
-                padding = new RectOffset(4, 4, 0, 0)
-            };
-            cell_style = new GUIStyle(EditorStyles.label)
-            {
-                alignment = TextAnchor.MiddleLeft,
-                clipping = TextClipping.Clip,
-                padding = new RectOffset(2, 2, 0, 0)
-            };
-            small_cell_style = new GUIStyle(EditorStyles.label)
-            {
-                clipping = TextClipping.Clip,
-                wordWrap = false
-            };
-            summary_style = new GUIStyle(EditorStyles.textArea)
-            {
-                wordWrap = false
-            };
         }
 
         private enum CompareStatus

@@ -1,5 +1,4 @@
-// RenameToolWindow.cs (live preview + 2-pane before/after + Animator)
-// UI Toolkit rename tool with live (instant) preview and a two-pane diff-like preview.
+// UI Toolkit rename tool with a live before/after table and Animator support.
 // Features:
 // - Files & Folders rename (AssetDatabase.MoveAsset)
 // - Folder scope (recursive on/off)
@@ -7,6 +6,7 @@
 // - Two-pane Preview: LEFT = current (before) / RIGHT = new name (after)
 // Place this file under an Editor/ folder.
 
+using D9speed_BaseEditorUtils;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -72,9 +72,11 @@ public class RenameToolWindow : EditorWindow
     private Button _selectAllBtn;
     private Button _selectNoneBtn;
 
-    // Two-pane preview
-    private ListView _beforeList;
-    private ListView _afterList;
+    private MultiColumnListView _previewList;
+    private Label _countLabel;
+    private Label _emptyLabel;
+    private HelpBox _regexWarning;
+    private bool _invalidRegex;
 
     // State
     private List<RenamePreviewItem> _previewItems = new();
@@ -83,8 +85,8 @@ public class RenameToolWindow : EditorWindow
     public static void ShowWindow()
     {
         var wnd = GetWindow<RenameToolWindow>();
-        wnd.titleContent = new GUIContent("Rename Tool");
-        wnd.minSize = new Vector2(820, 540);
+        wnd.titleContent = new GUIContent("リネームツール");
+        wnd.minSize = new Vector2(680, 600);
         wnd.Show();
     }
 
@@ -100,7 +102,7 @@ public class RenameToolWindow : EditorWindow
 
     private void OnUnitySelectionChanged()
     {
-        if (_findText == null || _beforeList == null || _afterList == null) return;
+        if (_findText == null || _previewList == null) return;
         RefreshPreviewLive();
     }
 
@@ -112,96 +114,137 @@ public class RenameToolWindow : EditorWindow
     public void CreateUI(VisualElement root)
     {
         root.Clear();
-        root.style.paddingLeft = 8; root.style.paddingRight = 8; root.style.paddingTop = 8; root.style.paddingBottom = 8;
-        D9speedEditorFontUtility.Apply(root);
+        EditorUiTheme.Apply(root);
+        var sheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Packages/io.github.d9speed.rename_tool/Editor/rename_tool.uss");
+        if (sheet != null && !root.styleSheets.Contains(sheet)) root.styleSheets.Add(sheet);
+        root.AddToClassList("rename_tool");
 
-        // Find/Replace
-        _findText = new TextField("Find") { style = { flexGrow = 1 } };
-        _replaceText = new TextField("Replace") { style = { flexGrow = 1 } };
-        var findRow = new VisualElement { style = { flexDirection = FlexDirection.Row} };
+        var content = new VisualElement();
+        content.AddToClassList("d9_content");
+        content.AddToClassList("d9_grow");
+        content.AddToClassList("d9_window_body");
+        root.Add(content);
+        content.Add(EditorUiControls.Header("リネームツール", "ファイル・Hierarchy・Animator の名前をまとめて置換します。"));
+        var settings = new ScrollView(ScrollViewMode.Vertical) { name = "rename_settings" };
+        settings.AddToClassList("rename_settings");
+        content.Add(settings);
+        var replaceBox = EditorUiControls.Section(settings, "検索と置換");
+        var findRow = EditorUiControls.Row(false);
+        _findText = EditorUiControls.Field(new TextField("検索する文字列") { name = "find_text" });
+        _replaceText = EditorUiControls.Field(new TextField("置換後の文字列") { name = "replace_text" });
         findRow.Add(_findText);
         findRow.Add(_replaceText);
-        root.Add(findRow);
-
-        // Options
-        var optRow = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 4 } };
-        _useRegex = new Toggle("Use Regex");
-        _caseSensitive = new Toggle("Match Case");
-        _includeExtensions = new Toggle("Include extensions");
+        replaceBox.Add(findRow);
+        var optRow = EditorUiControls.Row();
+        _useRegex = EditorUiControls.Toggle("正規表現");
+        _caseSensitive = EditorUiControls.Toggle("大文字・小文字を区別");
+        _includeExtensions = EditorUiControls.Toggle("拡張子も置換する");
         optRow.Add(_useRegex);
         optRow.Add(_caseSensitive);
         optRow.Add(_includeExtensions);
-        root.Add(optRow);
+        replaceBox.Add(optRow);
+        _regexWarning = new HelpBox("正規表現が無効です。検索する文字列を修正してください。", HelpBoxMessageType.Warning);
+        _regexWarning.AddToClassList("d9_hidden");
+        replaceBox.Add(_regexWarning);
 
-        // Scope
-        var scopeBox = new GroupBox { text = "Asset Scope", style = { marginTop = 8 } };
-        
-        _folderField = new ObjectField("Folder") { objectType = typeof(DefaultAsset), allowSceneObjects = false, style = { flexGrow = 1 } };
-        _recursive = new Toggle("Recursive") { value = true, tooltip = "When a folder is selected, recurse into subfolders." };
-        _hierarchySelection = new Toggle("Hierarchy Selection Mode") { tooltip = "When enabled, rename uses the currently selected hierarchy GameObjects instead of project assets." };
-        var scopeRow = new VisualElement { style = { flexDirection = FlexDirection.Row,  } };
-        scopeRow.Add(_recursive);
+        var scopeBox = EditorUiControls.Section(settings, "対象を選ぶ");
+        _folderField = EditorUiControls.Field(new ObjectField("対象フォルダ") { objectType = typeof(DefaultAsset), allowSceneObjects = false });
+        _recursive = EditorUiControls.Toggle("サブフォルダも含める", true);
+        _recursive.tooltip = "フォルダを対象にするとき、下位のフォルダも再帰的に検索します。";
+        _hierarchySelection = EditorUiControls.Toggle("Hierarchyで選択したオブジェクトを対象にする");
+        _hierarchySelection.tooltip = "有効にすると、アセットの代わりにHierarchyで選択したGameObjectを対象にします。";
         scopeBox.Add(_hierarchySelection);
+        var scopeRow = EditorUiControls.Row(false);
+        scopeRow.Add(_folderField);
+        scopeRow.Add(_recursive);
         scopeBox.Add(scopeRow);
-        scopeBox.Add(_folderField);
-        root.Add(scopeBox);
-
-        // Animator
-        var animBox = new GroupBox { text = "Animator Controller (optional)", style = { marginTop = 8 } };
-        _animatorField = new ObjectField("AnimatorController") { objectType = typeof(AnimatorController), allowSceneObjects = false, style = { flexGrow = 1 } };
-        var animTogRow1 = new VisualElement { style = { flexDirection = FlexDirection.Row,  } };
-        var animTogRow2 = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 4 } };
-        _renameAnimatorStates = new Toggle("Rename States") { value = true };
-        _renameAnimatorParams = new Toggle("Rename Parameters") { value = true };
-        _renameAnimatorStateMachines = new Toggle("Rename State Machines") { value = true };
-        _renameAnimatorLayers = new Toggle("Rename Layers") { value = true };
-        animTogRow1.Add(_renameAnimatorStates);
-        animTogRow1.Add(_renameAnimatorParams);
-        animTogRow2.Add(_renameAnimatorStateMachines);
-        animTogRow2.Add(_renameAnimatorLayers);
+        scopeBox.Add(EditorUiControls.Label("Projectでアセットを選択している場合は、その選択が対象フォルダより優先されます。"));
+        var animBox = EditorUiControls.Foldout("Animator の名前も置換する（任意）");
+        animBox.viewDataKey = "rename_animator";
+        _animatorField = EditorUiControls.Field(new ObjectField("Animator Controller") { objectType = typeof(AnimatorController), allowSceneObjects = false });
+        _renameAnimatorStates = EditorUiControls.Toggle("ステート", true);
+        _renameAnimatorParams = EditorUiControls.Toggle("パラメーター", true);
+        _renameAnimatorStateMachines = EditorUiControls.Toggle("ステートマシン", true);
+        _renameAnimatorLayers = EditorUiControls.Toggle("レイヤー", true);
         animBox.Add(_animatorField);
-        animBox.Add(animTogRow1);
-        animBox.Add(animTogRow2);
-        root.Add(animBox);
+        var animRow = EditorUiControls.Row();
+        animRow.Add(_renameAnimatorStates);
+        animRow.Add(_renameAnimatorParams);
+        animRow.Add(_renameAnimatorStateMachines);
+        animRow.Add(_renameAnimatorLayers);
+        animBox.Add(animRow);
+        scopeBox.Add(animBox);
 
-        // Buttons
-        var btnRow = new VisualElement { style = { flexDirection = FlexDirection.Row,marginTop = 8 } };
-        _previewButton = new Button(OnPreview) { text = "Preview" };
-        _applyButton = new Button(OnApply) { text = "Apply", tooltip = "Apply the renames shown in the list." };
-        _selectAllBtn = new Button(() => SetAllSelected(true)) { text = "Select All" };
-        _selectNoneBtn = new Button(() => SetAllSelected(false)) { text = "Select None" };
-        btnRow.Add(_previewButton);
-        btnRow.Add(_applyButton);
-        btnRow.Add(_selectAllBtn);
-        btnRow.Add(_selectNoneBtn);
-        root.Add(btnRow);
+        var toolbar = EditorUiControls.Row();
+        _countLabel = EditorUiControls.Label("", "d9_section_title");
+        toolbar.Add(_countLabel);
+        _previewButton = EditorUiControls.Button("再確認", OnPreview);
+        _selectAllBtn = EditorUiControls.Button("すべて選択", () => SetAllSelected(true));
+        _selectNoneBtn = EditorUiControls.Button("選択解除", () => SetAllSelected(false));
+        toolbar.Add(_previewButton);
+        toolbar.Add(_selectAllBtn);
+        toolbar.Add(_selectNoneBtn);
+        content.Add(toolbar);
+        var preview = new VisualElement();
+        preview.AddToClassList("d9_grow");
+        preview.AddToClassList("d9_table_container");
+        _previewList = new MultiColumnListView
+        {
+            name = "rename_preview",
+            fixedItemHeight = 40,
+            selectionType = SelectionType.None,
+            reorderable = false
+        };
+        _previewList.AddToClassList("d9_table");
+        _previewList.columns.reorderable = false;
+        _previewList.columns.Add(new Column
+        {
+            name = "include", title = "適用", width = 52, minWidth = 52, maxWidth = 52,
+            resizable = false,
+            makeCell = () =>
+            {
+                var toggle = EditorUiControls.Toggle("");
+                toggle.AddToClassList("d9_table_check");
+                toggle.tooltip = "この変更を適用対象に含める";
+                toggle.RegisterValueChangedCallback(evt =>
+                {
+                    if (toggle.userData is RenamePreviewItem item)
+                    {
+                        item.selected = evt.newValue;
+                        _previewList.RefreshItems();
+                        ShowCountSummary();
+                    }
+                });
+                return toggle;
+            },
+            bindCell = (element, index) =>
+            {
+                var item = _previewItems[index];
+                element.userData = item;
+                ((Toggle)element).SetValueWithoutNotify(item.selected);
+            }
+        });
+        AddPreviewColumn("before", "変更前", FormatBefore);
+        AddPreviewColumn("after", "変更後", FormatAfter);
+        preview.Add(_previewList);
+        _emptyLabel = EditorUiControls.Label("", "d9_empty_state");
+        _emptyLabel.pickingMode = PickingMode.Ignore;
+        preview.Add(_emptyLabel);
+        content.Add(preview);
 
-        // Two-pane preview (Before / After)
-        var split = new TwoPaneSplitView(0, 400, TwoPaneSplitViewOrientation.Horizontal)
-        { style = { flexGrow = 1, marginTop = 8 } };
+        var footer = new VisualElement();
+        footer.AddToClassList("d9_footer");
+        _applyButton = EditorUiControls.Button("選択した変更を適用", OnApply, true);
+        _applyButton.name = "apply_renames";
+        footer.Add(_applyButton);
+        footer.Add(EditorUiControls.Label("変更前後を確認し、適用する行にチェックを入れてください。"));
+        root.Add(footer);
 
-        var beforeGroup = new GroupBox { text = "Before (current)", style = { flexGrow = 1 } };
-        var afterGroup  = new GroupBox { text = "After (preview)",  style = { flexGrow = 1 } };
-
-        _beforeList = MakeListView();
-        _afterList  = MakeListView();
-
-        beforeGroup.Add(_beforeList);
-        afterGroup.Add(_afterList);
-        split.Add(beforeGroup);
-        split.Add(afterGroup);
-        root.Add(split);
-
-        var help = new HelpBox("2-Pane Live Preview: LEFT shows current names, RIGHT shows the renamed result. If Project selection exists, it is prioritized over Folder scope.", HelpBoxMessageType.Info);
-        root.Add(help);
-
-        // Live update wiring
         _findText.RegisterValueChangedCallback(_ => RefreshPreviewLive());
         _replaceText.RegisterValueChangedCallback(_ => RefreshPreviewLive());
         _useRegex.RegisterValueChangedCallback(_ => RefreshPreviewLive());
         _caseSensitive.RegisterValueChangedCallback(_ => RefreshPreviewLive());
         _includeExtensions.RegisterValueChangedCallback(_ => RefreshPreviewLive());
-        
         _folderField.RegisterValueChangedCallback(_ => RefreshPreviewLive());
         _recursive.RegisterValueChangedCallback(_ => RefreshPreviewLive());
         _hierarchySelection.RegisterValueChangedCallback(_ => { UpdateScopeFieldStates(); RefreshPreviewLive(); });
@@ -210,9 +253,30 @@ public class RenameToolWindow : EditorWindow
         _renameAnimatorParams.RegisterValueChangedCallback(_ => RefreshPreviewLive());
         _renameAnimatorStateMachines.RegisterValueChangedCallback(_ => RefreshPreviewLive());
         _renameAnimatorLayers.RegisterValueChangedCallback(_ => RefreshPreviewLive());
-
         UpdateScopeFieldStates();
         RefreshPreviewLive();
+    }
+
+    private void AddPreviewColumn(string name, string title, Func<RenamePreviewItem, string> format)
+    {
+        _previewList.columns.Add(new Column
+        {
+            name = name, title = title, width = 300, minWidth = 180, stretchable = true, resizable = true,
+            makeCell = () => EditorUiControls.Label("", "d9_table_cell"),
+            bindCell = (element, index) =>
+            {
+                var item = _previewItems[index];
+                var label = (Label)element;
+                label.text = format(item);
+                label.tooltip = label.text;
+                label.EnableInClassList("d9_muted", !item.selected);
+            }
+        });
+    }
+
+    private void OnInspectorUpdate()
+    {
+        EditorUiTheme.RefreshTheme(rootVisualElement);
     }
 
     private void UpdateScopeFieldStates()
@@ -220,40 +284,26 @@ public class RenameToolWindow : EditorWindow
         if ( _folderField == null || _recursive == null) return;
         bool hierarchyMode = UsingHierarchySelection;
         _recursive.SetEnabled(!hierarchyMode);
+        _folderField.SetEnabled(!hierarchyMode);
         
     }
 
     private bool UsingHierarchySelection => _hierarchySelection != null && _hierarchySelection.value;
 
-    private static ListView MakeListView()
-    {
-        var lv = new ListView
-        {
-            virtualizationMethod = CollectionVirtualizationMethod.DynamicHeight,
-            selectionType = SelectionType.None,
-            showBorder = true,
-            showAlternatingRowBackgrounds = AlternatingRowBackground.ContentOnly,
-            style = { flexGrow = 1 }
-        };
-        lv.makeItem = () => new Label { style = { whiteSpace = WhiteSpace.Normal } };
-        // bindItem will be assigned per-pane
-        return lv;
-    }
-
     private void SetAllSelected(bool selected)
     {
         foreach (var it in _previewItems) it.selected = selected;
-        _beforeList.Rebuild();
-        _afterList.Rebuild();
+        _previewList.RefreshItems();
+        ShowCountSummary();
     }
 
-    private void OnPreview() => OnPreviewImpl();
+    private void OnPreview() => RefreshPreviewLive();
 
     private void OnApply()
     {
-        if (_previewItems.Count == 0)
+        if (!_previewItems.Any(item => item.selected) || _invalidRegex)
         {
-            EditorUtility.DisplayDialog("Nothing to apply", "Nothing to rename.", "OK");
+            EditorUtility.DisplayDialog("適用する変更がありません", "検索条件と、適用対象のチェックを確認してください。", "閉じる");
             return;
         }
 
@@ -267,12 +317,12 @@ public class RenameToolWindow : EditorWindow
                 if (it.oldPath == it.newPath) continue;
                 if (AssetDatabase.LoadMainAssetAtPath(it.newPath) != null || AssetDatabase.IsValidFolder(it.newPath))
                 {
-                    Debug.LogWarning($"Skip (exists): {it.newPath}");
+                    Debug.LogWarning($"同名のアセットが存在するためスキップ: {it.newPath}");
                     continue;
                 }
                 string err = AssetDatabase.MoveAsset(it.oldPath, it.newPath);
-                if (!string.IsNullOrEmpty(err)) Debug.LogError($"Failed to move {it.oldPath} -> {it.newPath}: {err}");
-                else Debug.Log($"Renamed: {it.oldPath} -> {it.newPath}");
+                if (!string.IsNullOrEmpty(err)) Debug.LogError($"移動に失敗しました: {it.oldPath} -> {it.newPath}: {err}");
+                else Debug.Log($"名前を変更しました: {it.oldPath} -> {it.newPath}");
             }
         }
         finally
@@ -288,17 +338,27 @@ public class RenameToolWindow : EditorWindow
         var animatorChanges = _previewItems.Where(i => i.selected && i.IsAnimatorRelated).ToList();
         if (animatorChanges.Count > 0) ApplyAnimatorChanges(animatorChanges);
 
-        EditorUtility.DisplayDialog("Done", "Renaming complete. See Console for details.", "OK");
+        EditorUtility.DisplayDialog("リネーム処理が完了しました", "詳細はConsoleを確認してください。", "閉じる");
+        RefreshPreviewLive();
     }
 
     private void RefreshPreviewLive()
     {
+        _invalidRegex = false;
         if (_useRegex.value && !string.IsNullOrEmpty(_findText.value))
         {
             try { _ = new Regex(_findText.value); }
-            catch (Exception ex) { Debug.LogWarning($"[RenameTool] Invalid regex: {_findText.value} => {ex.Message}"); }
+            catch (ArgumentException) { _invalidRegex = true; }
         }
+        _regexWarning.EnableInClassList("d9_hidden", !_invalidRegex);
         OnPreviewImpl();
+    }
+
+    private void RefreshPreviewTable()
+    {
+        _previewList.itemsSource = _previewItems;
+        _previewList.Rebuild();
+        ShowCountSummary();
     }
 
     private void OnPreviewImpl()
@@ -309,14 +369,7 @@ public class RenameToolWindow : EditorWindow
         var repl = _replaceText.value ?? string.Empty;
         if (string.IsNullOrEmpty(find))
         {
-            // clear
-            _beforeList.itemsSource = _previewItems;
-            _afterList.itemsSource = _previewItems;
-            _beforeList.bindItem = (ve, i) => ((Label)ve).text = string.Empty;
-            _afterList.bindItem  = (ve, i) => ((Label)ve).text = string.Empty;
-            _beforeList.Rebuild();
-            _afterList.Rebuild();
-            ShowCountSummary();
+            RefreshPreviewTable();
             return;
         }
 
@@ -413,27 +466,20 @@ public class RenameToolWindow : EditorWindow
             .ThenBy(it => it.DisplaySortKey)
             .ToList();
 
-        // Bind before/after
-        _beforeList.itemsSource = _previewItems;
-        _afterList.itemsSource  = _previewItems;
-        _beforeList.bindItem = (ve, i) => ((Label)ve).text = FormatBefore(_previewItems[i]);
-        _afterList.bindItem  = (ve, i) => ((Label)ve).text = FormatAfter(_previewItems[i]);
-        _beforeList.Rebuild();
-        _afterList.Rebuild();
-        ShowCountSummary();
+        RefreshPreviewTable();
     }
 
     private static string FormatBefore(RenamePreviewItem it)
     {
         return it.kind switch
         {
-            RenameKind.File   => $"[FILE]  {it.oldPath}",
-            RenameKind.Folder => $"[FOLDER]{it.oldPath}",
-            RenameKind.HierarchyObject => $"[HIER]  {it.hierarchyPath}",
-            RenameKind.AnimatorState => $"[STATE] {it.animatorController?.name}: {it.oldName}",
-            RenameKind.AnimatorParam => $"[PARAM] {it.animatorController?.name}: {it.oldName}",
-            RenameKind.AnimatorStateMachine => $"[SM]    {it.animatorController?.name}: {it.oldName}",
-            RenameKind.AnimatorLayer => $"[LAYER] {it.animatorController?.name}: {it.oldName}",
+            RenameKind.File   => $"[ファイル]  {it.oldPath}",
+            RenameKind.Folder => $"[フォルダ]{it.oldPath}",
+            RenameKind.HierarchyObject => $"[Hierarchy]  {it.hierarchyPath}",
+            RenameKind.AnimatorState => $"[ステート] {it.animatorController?.name}: {it.oldName}",
+            RenameKind.AnimatorParam => $"[パラメーター] {it.animatorController?.name}: {it.oldName}",
+            RenameKind.AnimatorStateMachine => $"[ステートマシン]    {it.animatorController?.name}: {it.oldName}",
+            RenameKind.AnimatorLayer => $"[レイヤー] {it.animatorController?.name}: {it.oldName}",
             _ => string.Empty
         };
     }
@@ -444,7 +490,7 @@ public class RenameToolWindow : EditorWindow
         {
             RenameKind.File   => $"{it.newPath}",
             RenameKind.Folder => $"{it.newPath}",
-            RenameKind.HierarchyObject => $"[HIER]  {BuildHierarchyAfterPath(it)}",
+            RenameKind.HierarchyObject => $"[Hierarchy]  {BuildHierarchyAfterPath(it)}",
             RenameKind.AnimatorState => $"{it.animatorController?.name}: {it.newName}",
             RenameKind.AnimatorParam => $"{it.animatorController?.name}: {it.newName}",
             RenameKind.AnimatorStateMachine => $"{it.animatorController?.name}: {it.newName}",
@@ -597,14 +643,17 @@ public class RenameToolWindow : EditorWindow
 
     private void ShowCountSummary()
     {
-        int files = _previewItems.Count(i => i.kind == RenameKind.File);
-        int folders = _previewItems.Count(i => i.kind == RenameKind.Folder);
-        int hierarchy = _previewItems.Count(i => i.kind == RenameKind.HierarchyObject);
-        int st = _previewItems.Count(i => i.kind == RenameKind.AnimatorState);
-        int sm = _previewItems.Count(i => i.kind == RenameKind.AnimatorStateMachine);
-        int ly = _previewItems.Count(i => i.kind == RenameKind.AnimatorLayer);
-        int pr = _previewItems.Count(i => i.kind == RenameKind.AnimatorParam);
-        Debug.Log($"Preview: files={files}, folders={folders}, hierarchy={hierarchy}, states={st}, stateMachines={sm}, layers={ly}, params={pr}");
+        int selected = _previewItems.Count(item => item.selected);
+        _countLabel.text = $"変更 { _previewItems.Count } 件 · 選択 {selected} 件";
+        _countLabel.tooltip = $"ファイル {_previewItems.Count(i => i.kind == RenameKind.File)} / フォルダ {_previewItems.Count(i => i.kind == RenameKind.Folder)} / Hierarchy {_previewItems.Count(i => i.kind == RenameKind.HierarchyObject)} / Animator {_previewItems.Count(i => i.IsAnimatorRelated)}";
+        _emptyLabel.text = string.IsNullOrEmpty(_findText.value)
+            ? "対象を選び、検索する文字列を入力すると変更内容が表示されます。"
+            : "変更対象がありません。検索条件と対象を確認してください。";
+        _emptyLabel.EnableInClassList("d9_hidden", _previewItems.Count > 0);
+        _applyButton.text = $"選択した {selected} 件を適用";
+        _applyButton.SetEnabled(selected > 0 && !_invalidRegex);
+        _selectAllBtn.SetEnabled(_previewItems.Count > 0);
+        _selectNoneBtn.SetEnabled(selected > 0);
     }
 
     private void ApplyHierarchyChanges(List<RenamePreviewItem> hierarchyChanges)
@@ -617,7 +666,7 @@ public class RenameToolWindow : EditorWindow
 
         if (targets.Length == 0) return;
 
-        Undo.RecordObjects(targets, "Rename Hierarchy Objects");
+        Undo.RecordObjects(targets, "Hierarchyの名前を変更");
 
         foreach (var it in hierarchyChanges)
         {
@@ -672,7 +721,7 @@ public class RenameToolWindow : EditorWindow
             var ac = grp.Key;
             if (ac == null) continue;
 
-            Undo.RegisterCompleteObjectUndo(ac, "Rename Animator Items");
+            Undo.RegisterCompleteObjectUndo(ac, "Animatorの名前を変更");
 
             // Parameters first
             var paramMap = new Dictionary<string, string>();
@@ -682,7 +731,7 @@ public class RenameToolWindow : EditorWindow
                 string neu = it.newName;
                 if (ac.parameters.Any(p => p.name == neu))
                 {
-                    Debug.LogWarning($"Animator '{ac.name}': parameter '{neu}' already exists. Skipping rename from '{old}'.");
+                    Debug.LogWarning($"Animator '{ac.name}': パラメーター '{neu}' が既に存在するため、'{old}' の変更をスキップしました。");
                     continue;
                 }
                 var p = ac.parameters.FirstOrDefault(pp => pp.name == old);
@@ -691,7 +740,7 @@ public class RenameToolWindow : EditorWindow
                     p.name = neu;
                     SetParameter(ac, p);
                     paramMap[old] = neu;
-                    Debug.Log($"Animator '{ac.name}': Parameter {old} -> {neu}");
+                    Debug.Log($"Animator '{ac.name}': パラメーター {old} -> {neu}");
                 }
             }
 
@@ -708,7 +757,7 @@ public class RenameToolWindow : EditorWindow
                 if (state == null) continue;
                 state.name = it.newName;
                 EditorUtility.SetDirty(ac);
-                Debug.Log($"Animator '{ac.name}': State {it.oldName} -> {it.newName}");
+                Debug.Log($"Animator '{ac.name}': ステート {it.oldName} -> {it.newName}");
             }
 
             // State Machines
@@ -718,7 +767,7 @@ public class RenameToolWindow : EditorWindow
                 if (sm == null) continue;
                 sm.name = it.newName;
                 EditorUtility.SetDirty(ac);
-                Debug.Log($"Animator '{ac.name}': StateMachine {it.oldName} -> {it.newName}");
+                Debug.Log($"Animator '{ac.name}': ステートマシン {it.oldName} -> {it.newName}");
             }
 
             // Layers
@@ -730,7 +779,7 @@ public class RenameToolWindow : EditorWindow
                 layer.name = it.newName;
                 ac.layers[idx] = layer;
                 EditorUtility.SetDirty(ac);
-                Debug.Log($"Animator '{ac.name}': Layer {it.oldName} -> {it.newName}");
+                Debug.Log($"Animator '{ac.name}': レイヤー {it.oldName} -> {it.newName}");
             }
 
             EditorUtility.SetDirty(ac);
@@ -905,13 +954,13 @@ public class RenamePreviewItem
         // Not used in 2-pane mode, but kept for compatibility.
         return kind switch
         {
-            RenameKind.File => $"[FILE]  {oldPath}  =>  {newPath}",
-            RenameKind.Folder => $"[FOLDER]{oldPath}  =>  {newPath}",
-            RenameKind.HierarchyObject => $"[HIER]  {hierarchyPath}  =>  {newName}",
-            RenameKind.AnimatorState => $"[STATE] {animatorController?.name}: {oldName}  =>  {newName}",
-            RenameKind.AnimatorParam => $"[PARAM] {animatorController?.name}: {oldName}  =>  {newName}",
-            RenameKind.AnimatorStateMachine => $"[SM]    {animatorController?.name}: {oldName}  =>  {newName}",
-            RenameKind.AnimatorLayer => $"[LAYER] {animatorController?.name}: {oldName}  =>  {newName}",
+            RenameKind.File => $"[ファイル]  {oldPath}  =>  {newPath}",
+            RenameKind.Folder => $"[フォルダ]{oldPath}  =>  {newPath}",
+            RenameKind.HierarchyObject => $"[Hierarchy]  {hierarchyPath}  =>  {newName}",
+            RenameKind.AnimatorState => $"[ステート] {animatorController?.name}: {oldName}  =>  {newName}",
+            RenameKind.AnimatorParam => $"[パラメーター] {animatorController?.name}: {oldName}  =>  {newName}",
+            RenameKind.AnimatorStateMachine => $"[ステートマシン]    {animatorController?.name}: {oldName}  =>  {newName}",
+            RenameKind.AnimatorLayer => $"[レイヤー] {animatorController?.name}: {oldName}  =>  {newName}",
             _ => string.Empty
         };
     }

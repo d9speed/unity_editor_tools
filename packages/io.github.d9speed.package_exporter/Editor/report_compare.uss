@@ -1,0 +1,9 @@
+.report_compare .report_setup { flex-basis: 280px; min-height: 50px; max-height: 280px; flex-shrink: 1; }
+.report_compare .report_paths { max-height: 180px; flex-shrink: 0; }
+.report_compare .report_summary { height: 108px; }
+.report_compare .report_details { height: 70px; }
+.report_compare .report_detail_foldout { flex-shrink: 0; }
+.report_compare .report_pane { width: 320px; flex-shrink: 0; align-self: flex-start; }
+.report_compare .report_pane .d9_section_title { margin-bottom: 8px; }
+.report_compare .report_pane .d9_description { white-space: normal; }
+.report_compare .d9_row > .d9_field { margin-right: 8px; }

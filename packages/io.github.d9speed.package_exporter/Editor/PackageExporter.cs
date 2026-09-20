@@ -315,116 +315,108 @@ public class PackageExporter : EditorWindow
     {
         var root = rootVisualElement;
         root.Clear();
-        root.style.paddingLeft = 8;
-        root.style.paddingRight = 8;
-        root.style.paddingTop = 8;
-        root.style.paddingBottom = 8;
         root.AddToClassList(root_class);
+        EditorUiTheme.Apply(root);
         AddStyleSheet(root);
-        D9speedEditorFontUtility.Apply(root);
-
-        var scroll = new ScrollView(ScrollViewMode.Vertical);
+        minSize = new Vector2(460, 480);
+        var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "export_settings" };
+        scroll.AddToClassList("d9_scroll");
+        scroll.contentContainer.AddToClassList("d9_content");
         root.Add(scroll);
-
-        scroll.Add(CreateTitle("Export Package Settings"));
+        scroll.Add(EditorUiControls.Header("Batch Exporter", "サブフォルダごとに Unity パッケージを書き出します。"));
         BuildProfileControls(scroll);
         BuildMainSettings(scroll);
         BuildSubfolderControls(scroll);
         BuildExclusionSettings(scroll);
         BuildNestedPrefabSelectionUI(scroll);
-        BuildExportControls(scroll);
+        BuildExportControls(root);
+    }
+
+    private void OnInspectorUpdate()
+    {
+        EditorUiTheme.RefreshTheme(rootVisualElement);
     }
 
     private void BuildProfileControls(VisualElement parent)
     {
         var box = CreateSection(parent, "エクスポートプロファイル");
         var row = CreateRow();
-        row.Add(CreateButton("エクスポートプロファイルを読み込み", () =>
+        row.Add(CreateButton("JSONを読み込む", () =>
         {
             LoadExportProfileFromJson();
             RebuildUI();
         }, button_load_class));
-        row.Add(CreateButton("現在のエクスポート設定内容をJsonに書き出し", () =>
+        row.Add(CreateButton("設定をJSONに保存", () =>
         {
             SaveCurrentSettingsAsProfileJson();
             RefreshUI();
         }, button_save_class));
         box.Add(row);
 
-        currentProfilePathLabel = new Label();
-        currentProfilePathLabel.style.whiteSpace = WhiteSpace.Normal;
+        currentProfilePathLabel = EditorUiControls.Label("");
         box.Add(currentProfilePathLabel);
     }
 
     private void BuildMainSettings(VisualElement parent)
     {
-        var box = CreateSection(parent, "Settings");
-        box.Add(CreateTextField("Export Path", exportPath, value =>
+        var box = CreateSection(parent, "出力設定");
+        box.Add(CreateTextField("エクスポート元フォルダ", exportPath, value =>
         {
             exportPath = value;
             OnMainSettingChanged();
         }));
-        box.Add(CreateTextField("Package Name", packageName, value =>
-        {
-            packageName = value;
-            OnMainSettingChanged();
-        }));
-
-        box.Add(new Label("ファイル名の追加部分（Date Format＋Subfolder Name＋任意文字列 最大5個）")
-        {
-            style =
-            {
-                unityFontStyleAndWeight = FontStyle.Bold,
-                marginTop = 4
-            }
-        });
-        packageNamePartsContainer = new VisualElement();
-        box.Add(packageNamePartsContainer);
-        addPackageNameStringButton = CreateButton("文字列を追加", AddPackageNameString, button_add_class);
-        box.Add(addPackageNameStringButton);
-        RefreshPackageNamePartsUI();
-
-        box.Add(CreateTextField("TE64.exe Path", te64Path, value =>
-        {
-            te64Path = value;
-            OnMainSettingChanged();
-        }));
-        box.Add(CreateToggle("TEで開く", openWithTE, value =>
-        {
-            openWithTE = value;
-            OnMainSettingChanged();
-        }));
-        box.Add(CreateToggle("サブフォルダに除外キーワードを含むファイル(テクスチャとかマテリアル)があったときにオーバーライド", overrideExclusionForSubfolders, value =>
-        {
-            overrideExclusionForSubfolders = value;
-            OnMainSettingChanged();
-        }));
-        box.Add(CreateTextField("Unityパッケージの出力フォルダ", outPath, value =>
+        var outputRow = CreateRow();
+        outputRow.Add(CreateTextField("出力先フォルダ", outPath, value =>
         {
             outPath = value;
             OnMainSettingChanged();
         }));
-
-        var output_button = CreateButton("Select Output Folder", () =>
+        outputRow.Add(CreateButton("参照…", () =>
         {
-            string selectedPath = EditorUtility.OpenFolderPanel("Select Folder", Directory.Exists(outPath) ? outPath : Application.dataPath, "");
+            string selectedPath = EditorUtility.OpenFolderPanel("出力先フォルダを選択", Directory.Exists(outPath) ? outPath : Application.dataPath, "");
             if (!string.IsNullOrEmpty(selectedPath))
             {
                 outPath = selectedPath;
                 SaveWindowStateToSettings("PackageExporter Output Folder Changed");
                 RebuildUI();
             }
-        }, button_select_class);
-        box.Add(output_button);
+        }, button_select_class));
+        box.Add(outputRow);
+        box.Add(CreateTextField("パッケージ名", packageName, value =>
+        {
+            packageName = value;
+            OnMainSettingChanged();
+        }));
+        var naming = EditorUiControls.Foldout("ファイル名の組み立て", true);
+        naming.viewDataKey = "export_naming";
+        naming.Add(EditorUiControls.Label("日付・サブフォルダ名・任意の文字列を、矢印で並べ替えられます。"));
+        packageNamePartsContainer = new VisualElement();
+        naming.Add(packageNamePartsContainer);
+        addPackageNameStringButton = CreateButton("文字列を追加（最大5個）", AddPackageNameString, button_add_class);
+        naming.Add(addPackageNameStringButton);
+        box.Add(naming);
+        RefreshPackageNamePartsUI();
 
-        packagePreviewWarningBox = new HelpBox("Date Format が無効です。例: yyyy-MM-dd", HelpBoxMessageType.Warning);
-        packagePreviewLabel = new Label { style = { whiteSpace = WhiteSpace.Normal } };
-        packagePreviewHintLabel = new Label("サブフォルダが複数の場合は \"***\" でプレビューします。");
-        packagePreviewHintLabel.style.fontSize = 11;
-        box.Add(new Label("Package Preview") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 6 } });
+        packagePreviewWarningBox = new HelpBox("日付書式が無効です。例: yyyy-MM-dd", HelpBoxMessageType.Warning);
+        packagePreviewLabel = EditorUiControls.Label("", "export_preview");
+        packagePreviewHintLabel = EditorUiControls.Label("サブフォルダが複数の場合は *** で表示します。");
         box.Add(packagePreviewWarningBox);
         box.Add(packagePreviewLabel);
         box.Add(packagePreviewHintLabel);
+
+        var integration = EditorUiControls.Foldout("出力後の外部アプリ連携");
+        integration.viewDataKey = "export_integration";
+        integration.Add(CreateTextField("TE64.exe のパス", te64Path, value =>
+        {
+            te64Path = value;
+            OnMainSettingChanged();
+        }));
+        integration.Add(CreateToggle("出力後に TE で開く", openWithTE, value =>
+        {
+            openWithTE = value;
+            OnMainSettingChanged();
+        }));
+        box.Add(integration);
     }
 
     private void BuildSubfolderControls(VisualElement parent)
@@ -458,7 +450,12 @@ public class PackageExporter : EditorWindow
 
     private void BuildExclusionSettings(VisualElement parent)
     {
-        var box = CreateSection(parent, "Exclusion Settings");
+        var box = CreateSection(parent, "除外設定とレポート");
+        box.Add(CreateToggle("サブフォルダ内のファイルを除外キーワードより優先する", overrideExclusionForSubfolders, value =>
+        {
+            overrideExclusionForSubfolders = value;
+            OnMainSettingChanged();
+        }));
         exclusionKeywordsContainer = new VisualElement();
         box.Add(exclusionKeywordsContainer);
         box.Add(CreateButton("除外キーワードを追加", () =>
@@ -474,7 +471,7 @@ public class PackageExporter : EditorWindow
             excludeDirectoriesWithHyphen = value;
             SaveExclusionSettingsChanged();
         }));
-        box.Add(CreateToggle("除外: metaファイルをログに記録するかどうか", includeMetaFiles, value =>
+        box.Add(CreateToggle("metaファイルをログに記録する", includeMetaFiles, value =>
         {
             includeMetaFiles = value;
             SaveExclusionSettingsChanged();
@@ -489,25 +486,28 @@ public class PackageExporter : EditorWindow
     private void BuildNestedPrefabSelectionUI(VisualElement parent)
     {
         precheckContainer = new VisualElement();
+        precheckContainer.AddToClassList("d9_section");
         parent.Add(precheckContainer);
     }
 
     private void BuildExportControls(VisualElement parent)
     {
-        var box = CreateSection(parent, "Export");
-        exportButton = CreateButton("Start Batch Export", () =>
+        var footer = new VisualElement();
+        footer.AddToClassList("d9_footer");
+        parent.Add(footer);
+        exportButton = CreateButton("バッチエクスポートを開始", () =>
         {
             StartBatchExport();
             RefreshUI();
         }, button_export_class);
-        box.Add(exportButton);
-
+        exportButton.name = "start_export";
+        footer.Add(exportButton);
         cancelNestedPrefabSelectionButton = CreateButton("ネストPrefab選択をキャンセル", () =>
         {
             ResetNestedPrefabSelectionState();
             RefreshUI();
         }, button_danger_class);
-        box.Add(cancelNestedPrefabSelectionButton);
+        footer.Add(cancelNestedPrefabSelectionButton);
     }
 
     private void RebuildUI()
@@ -534,8 +534,8 @@ public class PackageExporter : EditorWindow
         if (exportButton != null)
         {
             exportButton.text = pendingNestedPrefabSelection
-                ? "選択内容で Start Batch Export"
-                : "Start Batch Export";
+                ? "選択内容でエクスポートを開始"
+                : "バッチエクスポートを開始";
         }
 
         cancelNestedPrefabSelectionButton?.SetEnabled(pendingNestedPrefabSelection);
@@ -576,7 +576,7 @@ public class PackageExporter : EditorWindow
             if (partToken == date_format_part_token)
             {
                 packageNamePartsContainer.Add(CreatePackageNamePartRow(
-                    "Date Format",
+                    "日付書式",
                     dateFormat,
                     value =>
                     {
@@ -592,7 +592,7 @@ public class PackageExporter : EditorWindow
             if (partToken == subfolder_name_part_token)
             {
                 VisualElement subfolderRow = CreatePackageNamePartRow(
-                    "Subfolder Name（自動）",
+                    "サブフォルダ名（自動）",
                     GetSubfolderPreviewName(),
                     null,
                     sequenceIndex,
@@ -629,7 +629,7 @@ public class PackageExporter : EditorWindow
         Action onRemove)
     {
         var row = CreateRow();
-        var field = new TextField(label) { value = value ?? string.Empty };
+        var field = EditorUiControls.Field(new TextField(label) { value = value ?? string.Empty });
         if (onChange == null)
         {
             field.SetEnabled(false);
@@ -801,7 +801,7 @@ public class PackageExporter : EditorWindow
         subfolderContainer.Clear();
         if (subFolderSelections.Count == 0)
         {
-            subfolderContainer.Add(new Label("サブフォルダ未取得"));
+            subfolderContainer.Add(EditorUiControls.Label("元フォルダを指定し、「サブフォルダを取得」を押してください。"));
             return;
         }
 
@@ -809,7 +809,7 @@ public class PackageExporter : EditorWindow
         {
             string folderPath = kvp.Key;
             string folderName = Path.GetFileName(folderPath);
-            var toggle = new Toggle(folderName) { value = kvp.Value };
+            var toggle = EditorUiControls.Toggle(folderName, kvp.Value);
             toggle.RegisterValueChangedCallback(evt =>
             {
                 subFolderSelections[folderPath] = evt.newValue;
@@ -833,7 +833,7 @@ public class PackageExporter : EditorWindow
         {
             int index = i;
             var row = CreateRow();
-            var field = new TextField($"Keyword {index + 1}") { value = keywords[index] };
+            var field = EditorUiControls.Field(new TextField($"キーワード {index + 1}") { value = keywords[index] });
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt =>
             {
@@ -851,6 +851,7 @@ public class PackageExporter : EditorWindow
                 RefreshUI();
             }) { text = "削除" };
             removeButton.AddToClassList(button_base_class);
+            removeButton.AddToClassList("d9_button");
             removeButton.AddToClassList(button_danger_class);
             removeButton.style.width = 52;
             row.Add(removeButton);
@@ -939,58 +940,17 @@ public class PackageExporter : EditorWindow
 
     private static Label CreateTitle(string text)
     {
-        return new Label(text)
-        {
-            style =
-            {
-                unityFontStyleAndWeight = FontStyle.Bold,
-                marginBottom = 4
-            }
-        };
+        return EditorUiControls.Label(text, "d9_title");
     }
 
     private static VisualElement CreateSection(VisualElement parent, string title)
     {
-        parent.Add(new Label(title)
-        {
-            style =
-            {
-                unityFontStyleAndWeight = FontStyle.Bold,
-                marginTop = 8,
-                marginBottom = 3
-            }
-        });
-
-        var box = new VisualElement
-        {
-            style =
-            {
-                borderTopWidth = 1,
-                borderBottomWidth = 1,
-                borderLeftWidth = 1,
-                borderRightWidth = 1,
-                paddingLeft = 6,
-                paddingRight = 6,
-                paddingTop = 6,
-                paddingBottom = 6,
-                marginBottom = 8
-            }
-        };
-        parent.Add(box);
-        return box;
+        return EditorUiControls.Section(parent, title);
     }
 
     private static VisualElement CreateRow()
     {
-        return new VisualElement
-        {
-            style =
-            {
-                flexDirection = FlexDirection.Row,
-                marginTop = 2,
-                marginBottom = 2
-            }
-        };
+        return EditorUiControls.Row(false);
     }
 
     private static void AddStyleSheet(VisualElement root)
@@ -998,7 +958,7 @@ public class PackageExporter : EditorWindow
         var package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(PackageExporter).Assembly);
         if (package == null) return;
         var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(package.assetPath + "/Editor/PackageExporter.uss");
-        if (styleSheet != null)
+        if (styleSheet != null && !root.styleSheets.Contains(styleSheet))
         {
             root.styleSheets.Add(styleSheet);
         }
@@ -1006,47 +966,25 @@ public class PackageExporter : EditorWindow
 
     private static Button CreateButton(string text, Action onClick, params string[] classNames)
     {
-        var button = new Button(onClick)
-        {
-            text = text,
-            style =
-            {
-                flexGrow = 1,
-                marginLeft = 2,
-                marginRight = 2,
-                height = 28
-            }
-        };
+        var button = EditorUiControls.Button(text, onClick,
+            classNames != null && classNames.Contains(button_export_class));
         button.AddToClassList(button_base_class);
-        if (classNames == null || classNames.Length == 0)
-        {
-            button.AddToClassList(button_select_class);
-            return button;
-        }
-
-        foreach (var className in classNames)
-        {
-            if (!string.IsNullOrWhiteSpace(className))
-            {
-                button.AddToClassList(className);
-            }
-        }
-
+        if (classNames != null)
+            foreach (var className in classNames)
+                if (!string.IsNullOrWhiteSpace(className)) button.AddToClassList(className);
         return button;
     }
 
     private static TextField CreateTextField(string label, string value, Action<string> onChange)
     {
-        var field = new TextField(label) { value = value ?? string.Empty };
+        var field = EditorUiControls.Field(new TextField(label) { value = value ?? string.Empty });
         field.RegisterValueChangedCallback(evt => onChange(evt.newValue ?? string.Empty));
         return field;
     }
 
     private static Toggle CreateToggle(string label, bool value, Action<bool> onChange)
     {
-        var toggle = new Toggle(label) { value = value };
-        toggle.RegisterValueChangedCallback(evt => onChange(evt.newValue));
-        return toggle;
+        return EditorUiControls.Toggle(label, value, onChange);
     }
 
     private void LoadExportProfileFromJson()

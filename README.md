@@ -1,5 +1,7 @@
 # D9speed Unity Editor Tools
 
+Package Exporter 0.1.2（比較画面を含む）とRename Tool 0.1.1に、Editor Core 0.1.5のFluent 2共通UIを適用しました。Rename Toolの画面は日本語です。[UI更新の検証記録](docs/export_rename_fluent_validation_report.md)を参照してください。
+
 Unity Editor拡張を、機能ごとのVPMパッケージとして管理します。このリポジトリ自体はUnityプロジェクトではありません。
 
 ## 公開パッケージ

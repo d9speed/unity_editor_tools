@@ -18,6 +18,7 @@
 }
 
 .d9_ui_root .d9_header {
+    flex-shrink: 0;
     margin-bottom: var(--d9_space_l);
 }
 
@@ -35,6 +36,7 @@
 }
 
 .d9_ui_root .d9_section {
+    flex-shrink: 0;
     padding: var(--d9_space_l);
     margin-bottom: var(--d9_space_m);
     background-color: var(--d9_color_surface);
@@ -283,3 +285,113 @@
 .d9_ui_root .d9_hidden {
     display: none;
 }
+
+.d9_ui_root .d9_row {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: flex-end;
+    margin: var(--d9_space_xs) 0;
+}
+
+.d9_ui_root .d9_row_wrap { flex-wrap: wrap; }
+.d9_ui_root .d9_row > * { margin-right: var(--d9_space_s); }
+.d9_ui_root .d9_row > .d9_button { margin-bottom: var(--d9_space_xs); }
+.d9_ui_root .d9_grow { flex-grow: 1; min-width: 0; }
+.d9_ui_root .d9_window_body { flex-basis: 0; min-height: 0; }
+.d9_ui_root .d9_table_container { flex-basis: 160px; flex-shrink: 0; min-height: 160px; margin-top: 8px; }
+.d9_ui_root .d9_table_container > .d9_table {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    min-height: 0;
+}
+
+.d9_ui_root .d9_field {
+    flex-direction: column;
+    flex-grow: 1;
+    min-width: 0;
+    margin: 0 0 var(--d9_space_s) 0;
+}
+
+.d9_ui_root .d9_field > .unity-base-field__label {
+    margin: 0 0 var(--d9_space_xs) 0;
+    min-width: 0;
+    white-space: normal;
+    color: var(--d9_color_secondary);
+}
+
+.d9_ui_root .d9_field > .unity-base-field__input {
+    min-height: var(--d9_control_height);
+    background-color: var(--d9_color_input);
+    color: var(--d9_color_text);
+    border-width: 1px;
+    border-color: var(--d9_color_border);
+    border-bottom-color: var(--d9_color_input_border);
+    border-radius: var(--d9_radius_control);
+    padding: var(--d9_space_xs) var(--d9_space_s);
+    margin: 0;
+}
+
+.d9_ui_root .d9_field > .unity-base-field__input:focus {
+    border-bottom-width: 2px;
+    border-bottom-color: var(--d9_color_focus);
+}
+
+.d9_ui_root .d9_field:disabled > .unity-base-field__input {
+    background-color: var(--d9_color_disabled_surface);
+    color: var(--d9_color_disabled);
+}
+
+.d9_ui_root .d9_field .unity-object-field__object { margin: 0; }
+.d9_ui_root .d9_field .unity-object-field__selector { margin-left: var(--d9_space_s); }
+.d9_ui_root .d9_foldout { margin: var(--d9_space_s) 0; }
+.d9_ui_root .d9_foldout > .unity-foldout__toggle { min-height: 28px; -unity-font-style: bold; }
+.d9_ui_root .d9_foldout > .unity-foldout__content { margin-left: 0; padding-top: var(--d9_space_s); }
+.d9_ui_root .unity-help-box {
+    padding: var(--d9_space_s);
+    margin: var(--d9_space_s) 0;
+    background-color: var(--d9_color_selected);
+    border-width: 1px;
+    border-color: var(--d9_color_border);
+    border-radius: var(--d9_radius_control);
+}
+.d9_ui_root .unity-help-box__text { color: var(--d9_color_text); font-size: var(--d9_font_caption); }
+
+.d9_ui_root .d9_table {
+    flex-grow: 1;
+    min-height: 160px;
+    background-color: var(--d9_color_input);
+    border-width: 1px;
+    border-color: var(--d9_color_border);
+    border-radius: var(--d9_radius_control);
+}
+.d9_ui_root .d9_table .unity-list-view__empty-label { display: none; }
+.d9_ui_root .d9_table .unity-multi-column-header,
+.d9_ui_root .d9_table .unity-multi-column-header__column {
+    background-color: var(--d9_color_surface);
+    border-color: var(--d9_color_border);
+    min-height: 32px;
+}
+.d9_ui_root .d9_table .unity-multi-column-header__column__title {
+    color: var(--d9_color_secondary);
+    -unity-font-style: bold;
+}
+.d9_ui_root .d9_table .unity-collection-view__item { border-bottom-width: 1px; border-bottom-color: var(--d9_color_border); }
+.d9_ui_root .d9_table .unity-collection-view__item:hover { background-color: var(--d9_color_hover); }
+.d9_ui_root .d9_table .unity-collection-view__item--selected { background-color: var(--d9_color_selected); }
+.d9_ui_root .d9_table_cell {
+    flex-grow: 1;
+    margin: 0;
+    padding: 0 var(--d9_space_s);
+    -unity-text-align: middle-left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.d9_ui_root .d9_table_check { margin: 0 var(--d9_space_s); align-self: center; }
+.d9_ui_root .d9_muted { color: var(--d9_color_disabled); }
+.d9_ui_root .d9_status_missing,
+.d9_ui_root .d9_status_countdiff { color: var(--d9_color_error); }
+.d9_ui_root .d9_status_extra { color: var(--d9_color_success); }
+.d9_ui_root .d9_status_locationdiff { color: var(--d9_color_note); }

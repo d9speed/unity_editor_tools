@@ -1,61 +1,16 @@
-.package-exporter__button {
+.package-exporter .package-exporter__button {
+    flex-shrink: 0;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+.package-exporter .export_preview {
+    padding: 12px;
+    margin: 8px 0;
+    background-color: var(--d9_color_selected);
+    color: var(--d9_color_selected_text);
+    border-radius: var(--d9_radius_control);
+    white-space: normal;
     -unity-font-style: bold;
-    color: rgb(238, 242, 246);
-    border-top-left-radius: 3px;
-    border-top-right-radius: 3px;
-    border-bottom-left-radius: 3px;
-    border-bottom-right-radius: 3px;
-    border-top-width: 1px;
-    border-right-width: 1px;
-    border-bottom-width: 1px;
-    border-left-width: 1px;
 }
-
-.package-exporter__button--load {
-    background-color: rgb(46, 87, 138);
-    border-top-color: rgb(75, 119, 170);
-    border-right-color: rgb(75, 119, 170);
-    border-bottom-color: rgb(75, 119, 170);
-    border-left-color: rgb(75, 119, 170);
-}
-
-.package-exporter__button--save {
-    background-color: rgb(45, 111, 71);
-    border-top-color: rgb(72, 145, 95);
-    border-right-color: rgb(72, 145, 95);
-    border-bottom-color: rgb(72, 145, 95);
-    border-left-color: rgb(72, 145, 95);
-}
-
-.package-exporter__button--select {
-    background-color: rgb(72, 78, 86);
-    border-top-color: rgb(98, 106, 116);
-    border-right-color: rgb(98, 106, 116);
-    border-bottom-color: rgb(98, 106, 116);
-    border-left-color: rgb(98, 106, 116);
-}
-
-.package-exporter__button--add {
-    background-color: rgb(40, 111, 105);
-    border-top-color: rgb(64, 148, 140);
-    border-right-color: rgb(64, 148, 140);
-    border-bottom-color: rgb(64, 148, 140);
-    border-left-color: rgb(64, 148, 140);
-}
-
-.package-exporter__button--export {
-    background-color: rgb(38, 130, 75);
-    border-top-color: rgb(82, 177, 113);
-    border-right-color: rgb(82, 177, 113);
-    border-bottom-color: rgb(82, 177, 113);
-    border-left-color: rgb(82, 177, 113);
-    height: 34px;
-}
-
-.package-exporter__button--danger {
-    background-color: rgb(128, 58, 49);
-    border-top-color: rgb(174, 88, 77);
-    border-right-color: rgb(174, 88, 77);
-    border-bottom-color: rgb(174, 88, 77);
-    border-left-color: rgb(174, 88, 77);
-}
+.package-exporter .d9_row > .d9_field { margin-right: 8px; }
+.package-exporter .d9_footer .d9_button { min-height: 36px; }

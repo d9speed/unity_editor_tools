@@ -1,4 +1,7 @@
 .d9_ui_root.d9_theme_dark {
+    --d9_color_error: #ff99a4;
+    --d9_color_success: #9fd89f;
+    --d9_color_note: #d2b9fa;
     --d9_color_canvas: #1f1f1f;
     --d9_color_surface: #292929;
     --d9_color_input: #242424;
