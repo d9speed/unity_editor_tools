@@ -28,6 +28,8 @@ Unity 2022.3.22f1で検証しています。旧Assets版と同時に入れると
 
 2026-09-20、Unity 2022.3.22f1の新規プロジェクトでZIPから導入し、7項目の自動確認が成功しました。詳細は[検証記録](docs/validation_report.md)を参照してください。
 
+同日、公開URLからvrc-get 1.9.2でScene Toolsを指定して導入し、Editor Coreの自動導入と配布ファイルの一致も確認しました。
+
 ## ZIPの作成
 
 PowerShellで`./tools/build_packages.ps1`を実行します。各ZIPの直下に`package.json`、`LICENSE.md`、`Editor`が入ります。既存の同名ZIPは上書きしません。出力先を変える場合は`-output_directory`で指定できます。
