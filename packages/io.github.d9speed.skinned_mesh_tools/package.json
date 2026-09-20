@@ -1,0 +1,20 @@
+{
+  "name": "io.github.d9speed.skinned_mesh_tools",
+  "displayName": "D9speed Skinned Mesh Tools",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "unityRelease": "22f1",
+  "description": "Extended SkinnedMeshRenderer inspector with blend shape and weighted bone utilities.",
+  "author": {
+    "name": "d9speed",
+    "email": "d09pseed@gmail.com",
+    "url": "https://github.com/d9speed"
+  },
+  "license": "MIT",
+  "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.skinned_mesh_tools",
+  "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.skinned_mesh_tools/CHANGELOG.md",
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/skinned_mesh_tools_v0.1.0/io.github.d9speed.skinned_mesh_tools-0.1.0.zip",
+  "vpmDependencies": {
+    "io.github.d9speed.editor_core": ">=0.1.1 <0.2.0"
+  }
+}

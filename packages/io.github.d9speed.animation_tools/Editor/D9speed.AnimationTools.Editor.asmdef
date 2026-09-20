@@ -1,0 +1,10 @@
+{
+  "name": "D9speed.AnimationTools.Editor",
+  "references": [
+    "D9speed.EditorUtils"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}

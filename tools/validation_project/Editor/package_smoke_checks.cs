@@ -116,6 +116,7 @@ namespace D9speed.PackageValidation
             });
             ToolsSmokeChecks.Run(check);
             ExporterCompareSmokeChecks.Run(check);
+            RemainingToolsSmokeChecks.Run(check);
             report.passed = report.checks.All(c => c.passed);
             Directory.CreateDirectory("Logs");
             File.WriteAllText("Logs/package_smoke_results.json", JsonUtility.ToJson(report, true));

@@ -13,6 +13,7 @@ foreach ($id in $package_ids) {
 }
 $plans = @()
 $guid_paths = @{}
+$external_vpm_dependencies = @('com.vrchat.avatars')
 foreach ($directory in $package_directories) {
     $manifest = Get-Content -LiteralPath (Join-Path $directory.FullName 'package.json') -Raw | ConvertFrom-Json
     if ($manifest.name -cne $directory.Name) { throw "Package name mismatch: $($directory.Name)" }
@@ -47,7 +48,7 @@ foreach ($directory in $package_directories) {
         }
     }
     foreach ($dependency in $manifest.vpmDependencies.PSObject.Properties) {
-        if (-not (Test-Path -LiteralPath (Join-Path $packages_root $dependency.Name))) {
+        if ($dependency.Name -notin $external_vpm_dependencies -and -not (Test-Path -LiteralPath (Join-Path $packages_root $dependency.Name))) {
             throw "Missing local dependency: $($dependency.Name)"
         }
     }

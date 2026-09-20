@@ -1,0 +1,10 @@
+{
+  "name": "D9speed.PrefabColorVariants.Editor",
+  "references": [
+    "D9speed.EditorUtils"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}

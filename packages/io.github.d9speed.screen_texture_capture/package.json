@@ -1,0 +1,17 @@
+{
+  "name": "io.github.d9speed.screen_texture_capture",
+  "displayName": "D9speed Screen Texture Capture",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "unityRelease": "22f1",
+  "description": "Windows desktop region capture into a live editor texture using an externally supplied FFmpeg executable.",
+  "author": {
+    "name": "d9speed",
+    "email": "d09pseed@gmail.com",
+    "url": "https://github.com/d9speed"
+  },
+  "license": "MIT",
+  "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.screen_texture_capture",
+  "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.screen_texture_capture/CHANGELOG.md",
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/screen_texture_capture_v0.1.0/io.github.d9speed.screen_texture_capture-0.1.0.zip"
+}
