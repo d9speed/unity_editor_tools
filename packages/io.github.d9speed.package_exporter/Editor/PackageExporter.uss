@@ -14,12 +14,43 @@
 }
 .package-exporter .d9_row > .d9_field { margin-right: 8px; }
 .package-exporter .d9_footer .d9_button { min-height: 36px; }
-.package-exporter .export_keyword_row { align-items: center; }
-.package-exporter .export_keyword_field { flex-direction: row; align-items: center; margin-bottom: 0; }
+.package-exporter .export_keyword_row { align-items: center; min-width: 0; }
+.package-exporter .export_keyword_row > .package-exporter__button { margin-right: 0; }
+.package-exporter .export_keyword_field {
+    flex-direction: row;
+    align-items: center;
+    flex-basis: 0;
+    flex-shrink: 1;
+    margin-bottom: 0;
+}
+.package-exporter .export_keyword_field > .unity-base-field__input {
+    min-width: 0;
+    flex-basis: 0;
+    flex-shrink: 1;
+}
 .package-exporter .export_keyword_field > .unity-base-field__label {
     width: 28px;
     min-width: 28px;
     flex-shrink: 0;
     margin: 0 8px 0 0;
     -unity-text-align: middle-right;
+}
+.package-exporter .d9_button.export_subfolder_button {
+    background-color: #107c10;
+    border-color: #107c10;
+    color: var(--d9_color_on_brand);
+}
+.package-exporter .export_subfolder_button:hover {
+    background-color: #0e700e;
+    border-color: #0e700e;
+}
+.package-exporter .export_subfolder_button:active {
+    background-color: #0b5a0b;
+    border-color: #0b5a0b;
+}
+.package-exporter .export_subfolder_button:focus { border-color: var(--d9_color_on_brand); }
+.package-exporter .export_subfolder_button:disabled {
+    background-color: var(--d9_color_disabled_surface);
+    border-color: var(--d9_color_border);
+    color: var(--d9_color_disabled);
 }

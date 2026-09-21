@@ -427,7 +427,7 @@ public class PackageExporter : EditorWindow
             GetSubfolders();
             ScheduleExportPrecheckScan();
             RefreshUI();
-        }, button_load_class));
+        }, button_load_class, "export_subfolder_button"));
 
         var row = CreateRow();
         row.Add(CreateButton("全部選択", () =>
