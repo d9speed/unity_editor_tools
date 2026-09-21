@@ -14,3 +14,12 @@
 }
 .package-exporter .d9_row > .d9_field { margin-right: 8px; }
 .package-exporter .d9_footer .d9_button { min-height: 36px; }
+.package-exporter .export_keyword_row { align-items: center; }
+.package-exporter .export_keyword_field { flex-direction: row; align-items: center; margin-bottom: 0; }
+.package-exporter .export_keyword_field > .unity-base-field__label {
+    width: 28px;
+    min-width: 28px;
+    flex-shrink: 0;
+    margin: 0 8px 0 0;
+    -unity-text-align: middle-right;
+}

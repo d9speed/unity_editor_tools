@@ -837,8 +837,9 @@ public class PackageExporter : EditorWindow
         {
             int index = i;
             var row = CreateRow();
-            var field = EditorUiControls.Field(new TextField($"キーワード {index + 1}") { value = keywords[index] });
-            field.style.flexGrow = 1;
+            row.AddToClassList("export_keyword_row");
+            var field = EditorUiControls.Field(new TextField($"{index + 1}.") { value = keywords[index] });
+            field.AddToClassList("export_keyword_field");
             field.RegisterValueChangedCallback(evt =>
             {
                 Undo.RecordObject(PackageExporterSettings.instance, "PackageExporter Exclusion Keyword Changed");
