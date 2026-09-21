@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.6 - 2026-09-21
+
+- Transform Mirrorで左右の末尾名（_L/_R、.L/.R、小文字、.001形式の連番）を入れ替え、子階層も対称化。
+- 最寄りのPrefabルートからDFS探索し、作成予定のオブジェクトとConstraint／PhysBoneの参照ペアを2ペインで事前表示。
+- Unity／VRC Constraintの参照・オフセット、PhysBoneのRoot／Ignore／Collider参照・Endpoint／Limit、PhysBone Colliderと標準Colliderの設定に対応。
+- VRC Constraintは複製側を停止し、配置・参照・オフセットを設定してからロック／有効状態を復元。
+- 重複選択・親子選択を整理し、同名既存オブジェクトの上書きを防止。処理全体をUndo／Redo可能に。
+
 ## 0.1.5 - 2026-09-21
 
 - Fluent 2の共通部品をテキスト欄・オブジェクト欄・折りたたみ・一覧表へ拡張。

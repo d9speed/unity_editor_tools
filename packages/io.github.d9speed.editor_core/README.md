@@ -21,7 +21,7 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 | Componentの右クリック → `ここから下のコンポーネントをコピー` | 選択コンポーネント以降をまとめてコピー |
 | Component／Hierarchyの右クリック → `コピーしたコンポーネントを新規貼り付け` | シーンオブジェクトへ追加。Undo対応 |
 | Hierarchyの右クリック → メインカメラ関連の2項目 | 対象へカメラを向ける／対象の+Z方向から正対。Undo対応 |
-| `D9speed > Transform Mirror Tool` | X軸方向のミラー複製。基準点・回転・PrefabのBlendShapeウェイトを指定 |
+| `D9speed > Transform Mirror Tool` | X軸方向のミラー複製。左右名・Constraint／PhysBone／Colliderの対称化と作成ペアの事前表示 |
 | `Alt + R` | 選択したシーンオブジェクトのローカルTransformをリセット。Undo対応 |
 | Hierarchy | コンポーネントに変更があるPrefabインスタンスのルートへ変更マークを表示 |
 
@@ -32,6 +32,17 @@ Transform Resetの割り当てはUnityのShortcutsにある`Custom/ShortCutEX/Tr
 0.1.4で、[Fluent 2のトークン設計](https://fluent2.microsoft.design/design-tokens)を基にしたUI Toolkitの共通スタイルを試験導入しています。Unityのライト／ダークに合わせて色を切り替えます。対象一覧へGameObjectやPrefabをドロップして、設定後に「ミラーを作成」を押します。「一覧をクリア」は一覧だけを空にし、シーンやアセットは削除しません。
 
 狭いウィンドウでは設定部分がスクロールし、実行ボタンは下部に表示されます。カスタム基準点を使わないときは座標欄を無効にし、ワールド原点を基準にします。対象と各オプションはスクリプトの再読み込みでも保持します。
+
+対象を追加すると「これから作る対称化ペア」に、左側へ作成元／現在の参照、右側へ作成予定先／対称化後の参照を表示します。「選択中を追加」「選択行を外す」「候補を更新」も利用できます。親と子を同時に追加しても子を二重複製しません。既存の対称オブジェクトは上書きせず、同名なら作成名に `_mirror_1` などを付けます。
+
+- 名前は末尾の `_L ↔ _R`、`.L ↔ .R` を交換します。小文字および `Hand_L.001 → Hand_R.001` にも対応します。左右名がない複製ルートには従来の `_Mirrored` を付け、左右名がない子の名前は維持します。
+- 探索範囲は対象ごとの最寄りのPrefabインスタンスルートです。Prefab以外はHierarchyルート、Prefabアセットはそのルートを使い、非アクティブを含めてDFSで探索します。左右名を交換した階層パスを優先し、見つからなければルート内の一意な左右名を使います。複数候補・範囲外・対応コンポーネント不足は状態を表示し、元の参照を維持します。
+- 子階層の位置・回転をワールドX方向に反転し、親にも一意な対称候補があればその親の下に作成します。探索ルートと反転平面は別で、反転平面は従来どおりワールド原点または指定した基準点です。
+- Unityの6種類のConstraintとVRC ConstraintのSource／Up／Target参照を対応付け、位置・回転オフセットも対称化します。今回作るオブジェクト間の参照を優先します。VRCの複製側は評価を止め、配置→参照置換→オフセット設定→ロック・有効状態復元の順に処理し、最後にSDKへ設定変更を通知します。
+- PhysBoneはRoot／Ignore Transforms／Collidersの参照、Endpoint Position、Limit Rotationを処理します。PhysBone ColliderはRoot参照、Position、Rotationを処理し、半径・高さ・形状などは引き継ぎます。標準のBox／Sphere／Capsule／CharacterController／Wheel Colliderは中心位置を反転し、寸法などを維持します。
+- シーン内の複製元の設定・Prefabオーバーライド・BlendShapeウェイトを引き継ぎます。ウェイトの引き継ぎを外すとPrefabの元の値、非Prefabなら0を使います。1回のUndoで作成分全体を取り消せます。
+
+VRChat SDKは必須依存にせず、導入されている場合に対応します。複製範囲外の `TargetTransform` を駆動するVRC Constraintは既存オブジェクトを動かさないよう複製側を無効化し、警告を表示します。MeshColliderの頂点形状・描画メッシュ・AnimationClipのパスやアニメーション値は反転しません。回転の反転を外した場合は形状全体の完全な鏡像にならない場合があります。
 
 共通スタイルは`Editor/ui`にあります。独自のEditorWindowへ適用する場合は、`CreateGUI()`から`EditorUiTheme.Apply(rootVisualElement)`を呼びます。開いたままのテーマ変更には`EditorUiTheme.RefreshTheme(rootVisualElement)`を`OnInspectorUpdate()`から呼びます。クラス`d9_ui_root`の配下だけに作用し、共通フォント設定を引き継ぎます。現在の適用先はTransform Mirrorです。
 

@@ -395,3 +395,37 @@
 .d9_ui_root .d9_status_countdiff { color: var(--d9_color_error); }
 .d9_ui_root .d9_status_extra { color: var(--d9_color_success); }
 .d9_ui_root .d9_status_locationdiff { color: var(--d9_color_note); }
+
+.d9_ui_root .d9_mirror_pairs {
+    height: 280px;
+    margin-top: var(--d9_space_s);
+    background-color: var(--d9_color_input);
+    border-width: 1px;
+    border-color: var(--d9_color_border);
+}
+.d9_ui_root .d9_mirror_pair_row {
+    flex-direction: row;
+    flex-grow: 1;
+    min-width: 0;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--d9_color_border);
+}
+.d9_ui_root .d9_mirror_cell {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
+    padding: var(--d9_space_s);
+    border-right-width: 1px;
+    border-right-color: var(--d9_color_border);
+    justify-content: center;
+}
+.d9_ui_root .d9_mirror_path {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-align: middle-left;
+}
+.d9_ui_root .d9_mirror_pairs .unity-collection-view__item--selected {
+    background-color: var(--d9_color_selected);
+}
+.d9_ui_root .d9_mirror_pairs .unity-list-view__empty-label { display: none; }

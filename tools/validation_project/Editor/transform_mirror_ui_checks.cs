@@ -104,6 +104,9 @@ namespace D9speed.PackageValidation
                     list.SendEvent(drop);
                 }
                 Require(execute.enabledSelf && clear.enabledSelf && root.Q<Label>("target_count").text == "1 件", "Drop filtering / target count");
+                Require(root.Q<ListView>("mirror_pairs").itemsSource.Count == 1, "Creation pair preview missing");
+                Require(root.Q<Label>("mirror_search_roots").text.Contains("mirror_ui_probe"), "Search root missing");
+                checks.Add("DFS search root and two-pane creation pair preview");
                 pivot_toggle.value = true;
                 pivot.value = new Vector3(1, 2, 3);
                 root.Q<Toggle>("mirror_rotation").value = false;
@@ -152,7 +155,7 @@ namespace D9speed.PackageValidation
                 Submit(root.Q<Button>("clear_targets"));
                 Require(!root.Q<Button>("create_mirror").enabledSelf && root.Q<Label>("target_count").text == "0 件" && source != null, "Clear changed scene or did not reset controls");
                 checks.Add("Clear only resets the list and disabled state");
-                window.position = new Rect(0, 0, 460, 740);
+                window.position = new Rect(0, 0, 820, 1100);
                 window.CreateGUI();
                 root.Q<Toggle>("use_custom_pivot").value = false;
                 root.Q<Vector3Field>("custom_pivot").value = Vector3.zero;
@@ -160,6 +163,22 @@ namespace D9speed.PackageValidation
                 Layout(root);
                 SaveLayout(root, "empty");
                 Capture(root, "empty");
+                source.name = "accessory_L";
+                var tip = new GameObject("tip.L");
+                tip.transform.SetParent(source.transform, false);
+                source.AddComponent<UnityEngine.Animations.ParentConstraint>().AddSource(
+                    new UnityEngine.Animations.ConstraintSource { sourceTransform = tip.transform, weight = 1 });
+                DragAndDrop.objectReferences = new Object[] { source };
+                using (var drop = DragPerformEvent.GetPooled())
+                {
+                    drop.target = root.Q<ListView>("mirror_targets");
+                    root.Q<ListView>("mirror_targets").SendEvent(drop);
+                }
+                Layout(root);
+                SaveLayout(root, "pairs");
+                Capture(root, "pairs");
+                Require(root.Q<ListView>("mirror_pairs").itemsSource.Count == 3, "Child and reference pair preview");
+                checks.Add("Two-pane parent/child and internal constraint reference preview");
             }
             catch (Exception error) { errors.Add(error.ToString()); }
             finally
