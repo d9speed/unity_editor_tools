@@ -1,7 +1,7 @@
 {
   "name": "io.github.d9speed.cloth_fitting_tools",
   "displayName": "D9speed Cloth Fitting Tools",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "description": "PhysBone weight-based capsule collider generation for VRChat avatars.",
@@ -17,5 +17,5 @@
   },
   "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.cloth_fitting_tools",
   "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.cloth_fitting_tools/CHANGELOG.md",
-  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/cloth_fitting_tools_v0.1.1/io.github.d9speed.cloth_fitting_tools-0.1.1.zip"
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/cloth_fitting_tools_v0.1.2/io.github.d9speed.cloth_fitting_tools-0.1.2.zip"
 }

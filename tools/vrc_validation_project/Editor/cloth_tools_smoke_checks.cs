@@ -25,7 +25,7 @@ namespace D9speed.PackageValidation
             };
             check("Cloth Fitting Tools and Core coexist with the expected SDK; cloth code remains Editor-only", () => {
                 var packages = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages();
-                require(packages.Any(p => p.name == "io.github.d9speed.cloth_fitting_tools" && p.version == "0.1.1"), "Cloth package version");
+                require(packages.Any(p => p.name == "io.github.d9speed.cloth_fitting_tools" && p.version == "0.1.2"), "Cloth package version");
                 require(packages.Any(p => p.name == "io.github.d9speed.editor_core"), "Core dependency");
                 var args = Environment.GetCommandLineArgs();
                 var expected_index = Array.IndexOf(args, "-d9speedExpectedSdkVersion");

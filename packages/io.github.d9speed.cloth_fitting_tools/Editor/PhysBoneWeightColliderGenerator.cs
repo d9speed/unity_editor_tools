@@ -40,12 +40,15 @@ namespace D9speed_Test_Editor
         private Button create_button;
         [SerializeField] private Animator humanoid_animator;
         [SerializeField] private VRCPhysBoneCollider selected_collider;
+        [SerializeField] private bool rotate_around_humanoid_bone;
         private ObjectField animator_field;
         private ObjectField collider_field;
         private SliderInt radius_slider;
         private SliderInt length_slider;
         private Vector3Field position_field;
         private Vector3Field rotation_field;
+        private PopupField<string> rotation_pivot_field;
+        private HelpBox rotation_pivot_status;
         private Button align_rotation_button;
         private Button mirror_button;
         private HelpBox status_box;
@@ -165,13 +168,22 @@ namespace D9speed_Test_Editor
             position_field.RegisterValueChangedCallback(evt => EditSelectedCollider("Move PhysBone Collider",
                 collider => collider.position = evt.newValue / 1000f));
             root.Add(position_field);
+            rotation_pivot_field = new PopupField<string>("回転の中心",
+                new List<string> { "コライダー中心", "ヒューマノイドボーン" }, rotate_around_humanoid_bone ? 1 : 0);
+            rotation_pivot_field.RegisterValueChangedCallback(evt =>
+            {
+                rotate_around_humanoid_bone = rotation_pivot_field.index == 1;
+                RefreshColliderControls();
+            });
+            root.Add(rotation_pivot_field);
+            rotation_pivot_status = new HelpBox(string.Empty, HelpBoxMessageType.Info);
+            root.Add(rotation_pivot_status);
             rotation_field = new Vector3Field("回転 XYZ (度)");
-            rotation_field.RegisterValueChangedCallback(evt => EditSelectedCollider("Rotate PhysBone Collider",
-                collider => collider.rotation = Quaternion.Euler(evt.newValue)));
+            rotation_field.RegisterValueChangedCallback(evt => rotate_selected_collider(
+                Quaternion.Euler(evt.newValue), "Rotate PhysBone Collider"));
             root.Add(rotation_field);
-            align_rotation_button = new Button(() => EditSelectedCollider("Align PhysBone Collider To Bone",
-                collider => collider.rotation = Quaternion.identity)) { text = "ボーンの軸に回転を合わせる" };
-            align_rotation_button.tooltip = "Root Transformのローカル回転オフセットを0にし、コライダーの軸をボーンの軸に合わせます。位置は保持します。";
+            align_rotation_button = new Button(() => rotate_selected_collider(
+                Quaternion.identity, "Align PhysBone Collider To Bone")) { text = "ボーンの軸に回転を合わせる" };
             root.Add(align_rotation_button);
             root.Add(new HelpBox("半径・長さ：10～500mm・1mm刻み。長さは両端を含む全長です。直径より短い場合は球形になります。位置・回転はRoot Transform基準、寸法はスケール1で実寸です。", HelpBoxMessageType.Info));
             status_box = new HelpBox("部位を選択してください。", HelpBoxMessageType.Info);
@@ -363,8 +375,22 @@ namespace D9speed_Test_Editor
             radius_slider.SetEnabled(editable);
             length_slider.SetEnabled(editable);
             position_field.SetEnabled(editable);
-            rotation_field.SetEnabled(editable);
-            align_rotation_button.SetEnabled(editable);
+            rotation_pivot_field.SetEnabled(editable);
+            rotation_pivot_field.SetValueWithoutNotify(rotation_pivot_field.choices[rotate_around_humanoid_bone ? 1 : 0]);
+            var has_pivot = try_get_rotation_pivot(out _, out var pivot_bone);
+            var can_rotate = editable && (!rotate_around_humanoid_bone || has_pivot);
+            rotation_field.SetEnabled(can_rotate);
+            align_rotation_button.SetEnabled(can_rotate);
+            align_rotation_button.tooltip = rotate_around_humanoid_bone
+                ? "選択した回転中心を基準に位置と向きを回し、Root Transformのローカル回転オフセットを0にします。"
+                : "Root Transformのローカル回転オフセットを0にし、コライダーの軸をボーンの軸に合わせます。位置は保持します。";
+            rotation_pivot_status.messageType = rotate_around_humanoid_bone && !has_pivot
+                ? HelpBoxMessageType.Warning : HelpBoxMessageType.Info;
+            rotation_pivot_status.text = !rotate_around_humanoid_bone
+                ? "コライダーの中心位置を保持して回転します。"
+                : has_pivot
+                    ? $"回転中心：{pivot_bone.name}。角度の変更に合わせて、位置もこのボーンのピボットを中心に回転します。"
+                    : "Root Transform（未指定時はコライダー自身）またはその親に、対応するHumanoidボーンがありません。Humanoid AnimatorとRoot Transformを確認してください。";
             mirror_button.SetEnabled(editable && TryGetMirrorBones(out _, out _, out _));
             status_box.messageType = HelpBoxMessageType.Info;
             status_box.text = "人体図をクリック、またはシーンのカプセルコライダーを指定してください。";
@@ -398,6 +424,53 @@ namespace D9speed_Test_Editor
             EditorUtility.SetDirty(selected_collider);
             RefreshColliderControls();
             SceneView.RepaintAll();
+        }
+
+        private bool try_get_rotation_pivot(out Transform collider_root, out Transform pivot_bone)
+        {
+            collider_root = selected_collider != null
+                ? (selected_collider.rootTransform != null ? selected_collider.rootTransform : selected_collider.transform)
+                : null;
+            pivot_bone = null;
+            if (collider_root == null) return false;
+            var animator = collider_root.GetComponentInParent<Animator>();
+            if (humanoid_animator != null && collider_root.IsChildOf(humanoid_animator.transform))
+                animator = humanoid_animator;
+            if (animator == null || animator.avatar == null || !animator.avatar.isValid || !animator.isHuman)
+                return false;
+            for (var candidate = collider_root; candidate != null && candidate != animator.transform; candidate = candidate.parent)
+            {
+                for (var index = 0; index < (int)HumanBodyBones.LastBone; index++)
+                {
+                    if (animator.GetBoneTransform((HumanBodyBones)index) != candidate) continue;
+                    pivot_bone = candidate;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void rotate_selected_collider(Quaternion rotation, string undo_name)
+        {
+            if (!CanEditSelectedCollider()) return;
+            var has_pivot = try_get_rotation_pivot(out var collider_root, out var pivot_bone);
+            if (rotate_around_humanoid_bone && !has_pivot)
+            {
+                RefreshColliderControls();
+                return;
+            }
+            EditSelectedCollider(undo_name, collider =>
+            {
+                if (rotate_around_humanoid_bone)
+                {
+                    var world_delta = collider_root.rotation * rotation *
+                        Quaternion.Inverse(collider.rotation) * Quaternion.Inverse(collider_root.rotation);
+                    var world_position = collider_root.TransformPoint(collider.position);
+                    collider.position = collider_root.InverseTransformPoint(
+                        pivot_bone.position + world_delta * (world_position - pivot_bone.position));
+                }
+                collider.rotation = rotation;
+            });
         }
 
         private bool TryGetMirrorBones(out Animator animator, out Transform source_bone, out Transform opposite_bone)
