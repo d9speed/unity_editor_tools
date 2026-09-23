@@ -324,6 +324,30 @@ internal static class MainCameraLookAtObjectMenu
     }
 }
 
+internal static class CopySelectedObjectNamesMenu
+{
+    private const string menu_path = "GameObject/選択オブジェクト名をコピー";
+
+    [MenuItem(menu_path, false, 0)]
+    private static void copy_selected_names()
+    {
+        var selected_names = Selection.gameObjects
+            .Where(game_object => game_object != null && !EditorUtility.IsPersistent(game_object))
+            .Select(game_object => game_object.name)
+            .ToArray();
+
+        if (selected_names.Length == 0) return;
+
+        EditorGUIUtility.systemCopyBuffer = string.Join(",", selected_names);
+    }
+
+    [MenuItem(menu_path, true)]
+    private static bool can_copy_selected_names()
+    {
+        return Selection.gameObjects.Any(game_object => game_object != null && !EditorUtility.IsPersistent(game_object));
+    }
+}
+
 internal static class CopyComponentNameMenu
 {
     [MenuItem("CONTEXT/Component/コンポーネント名をコピー")]

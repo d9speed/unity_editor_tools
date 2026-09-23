@@ -16,6 +16,7 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 | Projectの右クリック → `CopyFullPath` | ファイル・フォルダのフルパスをコピー。複数選択とPackages内の実体パスに対応 |
 | Projectの右クリック → `CopyAssetsWithDependency` | 選択したアセット群／フォルダを複製し、複製対象どうしの参照をコピー先へ変更 |
 | Hierarchyの右クリック → `Copy Animation Property Path` | 最も近いAnimatorを基準にしたパスをコピー。なければPrefabルート、シーンルートを使用 |
+| Hierarchyの右クリック → `選択オブジェクト名をコピー` | 選択したオブジェクト名を `Body,Skirt,Glasses` のようにカンマ区切りでコピー。親子の同時選択・非アクティブ・同名オブジェクトにも対応 |
 | Hierarchyの右クリック → `このヒエラルキー配下を検索` | 選択階層のパスをUnity Searchで検索 |
 | Componentの右クリック → `コンポーネント名をコピー` | コンポーネントの型名をコピー |
 | Componentの右クリック → `ここから下のコンポーネントをコピー` | 選択コンポーネント以降をまとめてコピー |
