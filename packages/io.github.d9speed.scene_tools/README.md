@@ -8,6 +8,10 @@ UnityのSceneビューに、オブジェクト名・コンポーネント情報�
 
 - オブジェクト名とコンポーネントをSceneビューへ表示。
 - カーソル付近の表示、カラム表示、ページ切替、ラベル固定、ボーン表示に対応。
+- SkinnedMeshRendererで絞り込まず、未使用・補助ボーンを含む現在の編集ステージ内のTransform全体が対象です。非表示・非アクティブは除外します。
+- 詳細設定の「ボーン階層（親子線）」で、Transformの親子を結ぶ線を切り替えます。スフィアとは個別にON／OFFできます。
+- 2カラムのTransformアイコン付き名前ラベルを、インスペクターのTransform参照欄へ直接ドラッグできます。ドラッグ中は選択を維持し、クリックで対象を選択します。
+- 最大深度の初期値は0（無制限）。更新前の保存値が残る場合は、最大深度を0に変更してください。スフィアサイズは最大1.0です。
 - `Tools > Display Child Names > Toggle Enabled`で有効・無効を切り替えます。
 - SceneビューのOverlaysメニューで`Display Child Names`の設定パネルを表示します。
 - `Toggle Label Lock`と`Toggle Enabled`はUnityのShortcuts設定からキーを割り当てられます。

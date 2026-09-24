@@ -1,7 +1,7 @@
 {
   "name": "io.github.d9speed.scene_tools",
   "displayName": "D9speed Scene Tools",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "description": "Scene View object and component labels, package versions, and prefab mesh information.",
@@ -10,5 +10,5 @@
   "vpmDependencies": { "io.github.d9speed.editor_core": ">=0.1.0 <0.2.0" },
   "documentationUrl": "https://github.com/d9speed/unity_editor_tools/tree/main/packages/io.github.d9speed.scene_tools",
   "changelogUrl": "https://github.com/d9speed/unity_editor_tools/blob/main/packages/io.github.d9speed.scene_tools/CHANGELOG.md",
-  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/scene_tools_v0.1.0/io.github.d9speed.scene_tools-0.1.0.zip"
+  "url": "https://github.com/d9speed/unity_editor_tools/releases/download/scene_tools_v0.1.1/io.github.d9speed.scene_tools-0.1.1.zip"
 }

@@ -1,7 +1,7 @@
-﻿// Column page size v6, based on compact settings v5.
+// Column page size v6, based on compact settings v5.
 // 1-30 object blocks per column/page. Nearby panel height follows the actual pages.
 // Screen bounds always apply; the previous pixel height cap is now optional.
-// No camera-driven repaint loop. Native hover picking remains MouseMove-only.
+// No camera-driven repaint loop. Scene Transform discovery is cached between hierarchy changes.
 // Compact nearby panel with stable hover transfer; screen-edge columns remain optional.
 // Column overflow is paginated, never resolved by overlapping/clamping labels.
 using D9speed_BaseEditorUtils;
@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEditor.ShortcutManagement;
+using UnityEditor.SceneManagement;
 #if UNITY_2021_2_OR_NEWER
 using UnityEditor.Overlays;
 using UnityEngine.UIElements;
@@ -57,14 +58,16 @@ public static class DisplayChildNamesInScene
     private const string session_key_show_settings = session_key_prefix + "show_settings";
     private const string session_key_show_vrc_phys_bone_components = session_key_prefix + "show_vrc_phys_bone_components";
     private const string session_key_show_bone_spheres = session_key_prefix + "show_bone_spheres";
+    private const string session_key_show_bone_hierarchy = session_key_prefix + "show_bone_hierarchy";
     private const string session_key_show_bone_spheres_near_cursor_only = session_key_prefix + "show_bone_spheres_near_cursor_only";
     private const string session_key_enable_bone_sphere_click_selection = session_key_prefix + "enable_bone_sphere_click_selection";
     private const string session_key_bone_sphere_size = session_key_prefix + "bone_sphere_size";
 
     private const float default_cursor_radius_pixels = 80f;
     private const float default_label_hold_radius_pixels = 180f;
-    private const float default_max_depth = 0.3f;
+    private const float default_max_depth = 0f;
     private const float default_bone_sphere_size = 0.06f;
+    private const float max_bone_sphere_size = 1.0f;
     private static readonly Vector2 default_gui_offset = new Vector2(0, 20);
     private const int default_font_size = 14;
     private static readonly Color default_label_color = Color.white;
@@ -81,6 +84,10 @@ public static class DisplayChildNamesInScene
     private const float label_anchor_group_pixels = 12f;
     private const float bone_sphere_pick_padding_pixels = 6f;
     private static readonly int bone_sphere_button_hash = "DisplayChildNamesInSceneBoneSphere".GetHashCode();
+    private static readonly int column_label_control_hash = "DisplayChildNamesInSceneTransformLabel".GetHashCode();
+    private static GUIStyle object_name_style;
+    private static Texture transform_icon;
+    private static readonly Vector3[] bone_line_points = new Vector3[2];
     private static readonly BindingFlags component_member_flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
     private const string session_key_two_columns = session_key_prefix + "two_columns";
@@ -191,13 +198,12 @@ public static class DisplayChildNamesInScene
     private sealed class SceneViewState
     {
         public SceneView view;
-        public SkinnedMeshRenderer renderer;
+        public StageHandle transform_stage;
         public HashSet<Transform> bones;
         public readonly List<Transform> ordered_bones = new List<Transform>();
         public readonly List<LabelHitArea> visible_labels = new List<LabelHitArea>();
         public readonly List<LabelDisplayInfo> labels = new List<LabelDisplayInfo>();
         public readonly List<BoneSphereDrawInfo> spheres = new List<BoneSphereDrawInfo>();
-        public bool pick_dirty = true;
         public bool bone_cache_dirty = true;
         public bool has_mouse_position;
         public Vector2 mouse_position;
@@ -207,7 +213,10 @@ public static class DisplayChildNamesInScene
         public Vector2 mouse_down_position;
         public bool dragged;
         public bool cancel_requested;
-        public double next_pick_warning_time;
+        public int active_column_label_control_id;
+        public Transform active_column_label_transform;
+        public Rect column_label_mouse_down_rect;
+        public Vector2 column_label_mouse_down_position;
         public readonly List<LabelCandidate> column_candidates = new List<LabelCandidate>();
         public readonly Dictionary<int, bool> column_sides = new Dictionary<int, bool>();
         public readonly LabelColumn left_column = new LabelColumn();
@@ -249,6 +258,7 @@ public static class DisplayChildNamesInScene
     private static bool showSettings = false;
     private static bool show_vrc_phys_bone_components = true;
     private static bool show_bone_spheres = true;
+    private static bool show_bone_hierarchy = true;
     private static bool show_bone_spheres_near_cursor_only = true;
     private static bool enable_bone_sphere_click_selection = false;
     private static Dictionary<Transform, List<Component>> phys_bone_root_reference_cache = new Dictionary<Transform, List<Component>>();
@@ -299,15 +309,19 @@ public static class DisplayChildNamesInScene
             return;
 
         Event e = Event.current;
-        // IMPORTANT: one ID on EVERY event, before any visibility/hotControl test.
+        // IMPORTANT: fixed IDs on EVERY event, before any visibility/hotControl test.
         // Visible bone count can no longer change the IDs of later Scene GUI controls.
         int sphere_control_id = GUIUtility.GetControlID(bone_sphere_button_hash, FocusType.Passive);
+        int column_label_control_id = GUIUtility.GetControlID(column_label_control_hash, FocusType.Passive);
         SceneViewState state = GetSceneViewState(sceneView);
         // Disabled means no input tracking, camera inspection, picking or repaint requests.
-        // Only release a sphere capture that this view already owns.
+        // Only release captures that this view already owns.
         CompleteActiveBoneSphereHandleIfNeeded(sceneView, state, e);
         if (!isEnabled || sceneView.camera == null)
+        {
+            clear_column_label_capture(state);
             return;
+        }
 
         sceneView.wantsMouseMove = true;
         TrackSceneViewInput(sceneView, state, e);
@@ -319,21 +333,23 @@ public static class DisplayChildNamesInScene
             // Bone positions are already in world space. Do not inherit other tools' state.
             Handles.matrix = Matrix4x4.identity;
 
-            if (GUIUtility.hotControl == 0 && !Tools.viewToolActive && !e.alt)
-                UpdatePickedBoneFilter(e, sceneView, state);
-
             // Build the control snapshot only on Layout, never during Repaint.
             // Keep component controls and their order unchanged throughout a drag.
             if (GUIUtility.hotControl == 0 && e.type == EventType.Layout)
+            {
+                refresh_scene_transform_cache(state);
                 RebuildLabelLayout(sceneView, state);
+            }
 
             // Rendering is not gated by another tool's hotControl.
+            draw_bone_hierarchy(sceneView, state);
             DrawBoneSpheres(sceneView, state, sphere_control_id);
 
             Handles.BeginGUI();
             try
             {
-                if (e.type == EventType.MouseDown && e.button == 0 &&
+                handle_column_label_input(sceneView, state, e, column_label_control_id);
+                if (!state.column_layout_active && e.type == EventType.MouseDown && e.button == 0 &&
                     !e.alt && !Tools.viewToolActive && GUIUtility.hotControl == 0)
                 {
                     foreach (LabelHitArea label in state.visible_labels)
@@ -369,12 +385,100 @@ public static class DisplayChildNamesInScene
         }
     }
 
+    private static void handle_column_label_input(
+        SceneView scene_view, SceneViewState state, Event current_event, int control_id)
+    {
+        if (state.active_column_label_control_id != 0)
+        {
+            if (GUIUtility.hotControl != state.active_column_label_control_id)
+            {
+                clear_column_label_capture(state);
+                return;
+            }
+
+            bool escape = current_event.type == EventType.KeyDown && current_event.keyCode == KeyCode.Escape;
+            if (!two_column_layout || !state.column_layout_active ||
+                state.active_column_label_transform == null || current_event.alt || Tools.viewToolActive ||
+                current_event.type == EventType.Ignore || current_event.type == EventType.MouseLeaveWindow ||
+                current_event.type == EventType.DragExited || escape)
+            {
+                clear_column_label_capture(state);
+                if (escape)
+                    current_event.Use();
+                scene_view.Repaint();
+                return;
+            }
+
+            if (current_event.type == EventType.MouseDrag && current_event.button == 0)
+            {
+                if ((current_event.mousePosition - state.column_label_mouse_down_position).sqrMagnitude > 16f)
+                {
+                    Transform dragged_transform = state.active_column_label_transform;
+                    // Keep the Inspector's current selection until a click is completed.
+                    // Release our capture before handing the reference to Unity's native drag.
+                    clear_column_label_capture(state);
+                    DragAndDrop.PrepareStartDrag();
+                    DragAndDrop.objectReferences = new Object[] { dragged_transform };
+                    DragAndDrop.StartDrag(dragged_transform.name + " (Transform)");
+                }
+                current_event.Use();
+                scene_view.Repaint();
+                return;
+            }
+
+            if (current_event.rawType == EventType.MouseUp && current_event.button == 0)
+            {
+                Transform clicked_transform = state.active_column_label_transform;
+                bool is_click = current_event.type == EventType.MouseUp &&
+                    state.column_label_mouse_down_rect.Contains(current_event.mousePosition) &&
+                    (current_event.mousePosition - state.column_label_mouse_down_position).sqrMagnitude <= 16f;
+                clear_column_label_capture(state);
+                if (is_click)
+                    SelectGameObject(clicked_transform.gameObject);
+                current_event.Use();
+                scene_view.Repaint();
+            }
+            return;
+        }
+
+        if (!two_column_layout || !state.column_layout_active ||
+            current_event.type != EventType.MouseDown || current_event.button != 0 ||
+            current_event.alt || Tools.viewToolActive || GUIUtility.hotControl != 0)
+            return;
+
+        foreach (LabelHitArea label in state.visible_labels)
+        {
+            if (label.gameObject == null || !label.rect.Contains(current_event.mousePosition))
+                continue;
+            state.active_column_label_control_id = control_id;
+            state.active_column_label_transform = label.gameObject.transform;
+            state.column_label_mouse_down_rect = label.rect;
+            state.column_label_mouse_down_position = current_event.mousePosition;
+            GUIUtility.hotControl = control_id;
+            GUIUtility.keyboardControl = 0;
+            current_event.Use();
+            scene_view.Repaint();
+            break;
+        }
+    }
+
+    private static void clear_column_label_capture(SceneViewState state)
+    {
+        if (state.active_column_label_control_id != 0 &&
+            GUIUtility.hotControl == state.active_column_label_control_id)
+            GUIUtility.hotControl = 0;
+        state.active_column_label_control_id = 0;
+        state.active_column_label_transform = null;
+        state.column_label_mouse_down_rect = default;
+        state.column_label_mouse_down_position = default;
+    }
+
     private static SceneViewState GetSceneViewState(SceneView sceneView)
     {
         int id = sceneView.GetInstanceID();
         if (!scene_view_states.TryGetValue(id, out SceneViewState state))
         {
-            // Closed windows must not retain their renderers and component references.
+            // Closed windows must not retain their Transform and component references.
             foreach (int dead_id in scene_view_states
                 .Where(pair => pair.Value.view == null).Select(pair => pair.Key).ToArray())
                 scene_view_states.Remove(dead_id);
@@ -388,16 +492,12 @@ public static class DisplayChildNamesInScene
     {
         // Do not compare camera matrices/pixelRect between GUI event phases.
         // In particular, neither Layout nor Repaint may schedule another repaint.
-        // Camera navigation already repaints the SceneView; the hover target is
-        // refreshed on the next real MouseMove, rather than re-rendering a pick pass.
+        // Camera navigation already repaints the SceneView; no mesh pick pass is needed.
         bool pointer_in_view = EditorWindow.mouseOverWindow == sceneView;
         bool pointer_event = e.isMouse || e.type == EventType.ScrollWheel ||
             e.type == EventType.MouseEnterWindow;
         if (pointer_in_view && pointer_event)
         {
-            if (!state.has_mouse_position ||
-                (e.mousePosition - state.mouse_position).sqrMagnitude > 0f)
-                state.pick_dirty = true;
             state.mouse_position = e.mousePosition;
             state.has_mouse_position = true;
         }
@@ -405,13 +505,11 @@ public static class DisplayChildNamesInScene
         if (pointer_in_view && (e.type == EventType.MouseMove ||
             e.type == EventType.MouseEnterWindow))
         {
-            state.pick_dirty = true;
             sceneView.Repaint();
         }
         else if (e.type == EventType.MouseLeaveWindow && state.has_mouse_position)
         {
             // One repaint to clear the hover highlight; do not start a timer/loop.
-            state.pick_dirty = true;
             sceneView.Repaint();
         }
     }
@@ -438,7 +536,6 @@ public static class DisplayChildNamesInScene
                 // Release hotControl only from the owning SceneView's GUI callback.
                 state.cancel_requested = true;
                 state.bones = null;
-                state.renderer = null;
                 state.ordered_bones.Clear();
                 state.visible_labels.Clear();
                 state.labels.Clear();
@@ -450,7 +547,6 @@ public static class DisplayChildNamesInScene
                 state.floating_origin_valid = false;
                 state.floating_focus_object = null;
                 state.column_content_dirty = true;
-                state.pick_dirty = true;
                 state.bone_cache_dirty = true;
             }
         }
@@ -482,7 +578,6 @@ public static class DisplayChildNamesInScene
         {
             GUIUtility.hotControl = 0;
             ClearActiveBoneSphere(state);
-            state.pick_dirty = true;
             if (escape)
                 e.Use();
             sceneView.Repaint();
@@ -504,7 +599,6 @@ public static class DisplayChildNamesInScene
             (e.mousePosition - state.mouse_down_position).sqrMagnitude <= 16f;
         GUIUtility.hotControl = 0;
         ClearActiveBoneSphere(state);
-        state.pick_dirty = true;
         if (is_click)
             ScheduleBoneSphereSelection(selected_bone);
         e.Use();
@@ -524,100 +618,52 @@ public static class DisplayChildNamesInScene
         phys_bone_root_reference_cache_dirty = true;
         foreach (SceneViewState state in scene_view_states.Values)
         {
-            state.pick_dirty = true;
             state.bone_cache_dirty = true;
             state.column_content_dirty = true;
         }
         SceneView.RepaintAll();
     }
 
-    private static void UpdatePickedBoneFilter(Event e, SceneView sceneView, SceneViewState state)
+    private static void refresh_scene_transform_cache(SceneViewState state)
     {
-        if (!isEnabled || GUIUtility.hotControl != 0 || Tools.viewToolActive || e.alt ||
-            !state.pick_dirty || !state.has_mouse_position ||
-            EditorWindow.mouseOverWindow != sceneView || !ShouldUpdatePickedBoneFilter(e))
+        StageHandle current_stage = StageUtility.GetCurrentStageHandle();
+        bool stage_changed = state.transform_stage != current_stage;
+        if (!state.bone_cache_dirty && !stage_changed)
             return;
 
-        // Do not pick the mesh behind a column, or drop the source while the
-        // pointer travels from the anchor cluster to its detached labels.
-        if (two_column_layout && ShouldHoldColumnTargets(state))
-            return;
-
-        state.pick_dirty = false;
-        try
+        // Includes auxiliary/unweighted Transforms and objects without any renderer.
+        // Stage scoping also keeps Prefab Mode separate from the main scene.
+        Transform[] transforms = current_stage.FindComponentsOfType<Transform>();
+        state.ordered_bones.Clear();
+        state.ordered_bones.AddRange(transforms.Where(bone => bone != null &&
+            bone.gameObject.scene.IsValid() && !EditorUtility.IsPersistent(bone) &&
+            (bone.gameObject.hideFlags & HideFlags.HideInHierarchy) == 0)
+            .OrderBy(bone => bone.GetInstanceID()));
+        state.bones = new HashSet<Transform>(state.ordered_bones);
+        state.transform_stage = current_stage;
+        state.bone_cache_dirty = false;
+        state.column_content_dirty = true;
+        if (stage_changed)
         {
-            // Give the label/component GUI a stable target while the pointer is over it.
-            bool over_label = state.labels.Any(label => label.block_rect.Contains(state.mouse_position));
-            bool retain_current = !state.bone_cache_dirty && state.bones != null && state.renderer != null;
-            if (retain_current && over_label)
-                return;
-
-            // Keep an actually hittable old sphere selectable just outside the mesh silhouette.
-            if (retain_current && show_bone_spheres &&
-                IsMouseNearCurrentBone(sceneView, state, true))
-                return;
-
-            SkinnedMeshRenderer renderer = FindPickedSkinnedMeshRenderer(state.mouse_position);
-            if (renderer == null && retain_current &&
-                (IsMouseInLabelHoldArea(state.mouse_position, state) ||
-                 (show_bone_spheres && IsMouseNearCurrentBone(sceneView, state, false))))
-                return;
-
-            if (renderer == state.renderer && !state.bone_cache_dirty)
-                return;
-
-            HashSet<Transform> bones = BuildPickedBoneFilter(renderer);
-            state.renderer = renderer;
-            state.bones = bones;
-            state.ordered_bones.Clear();
-            if (bones != null)
-                state.ordered_bones.AddRange(bones.OrderBy(bone => bone.GetInstanceID()));
-            state.bone_cache_dirty = false;
-        }
-        catch (ExitGUIException)
-        {
-            throw;
-        }
-        catch (System.Exception exception)
-        {
-            // A transient pick failure is not evidence that all bones disappeared.
-            // Preserve the last valid state and log at most once per 5 seconds/view.
-            if (EditorApplication.timeSinceStartup >= state.next_pick_warning_time)
-            {
-                state.next_pick_warning_time = EditorApplication.timeSinceStartup + 5.0;
-                Debug.LogWarning("Display Child Names: bone picking failed; previous display retained. " + exception.Message);
-            }
+            state.column_candidates.Clear();
+            state.column_sides.Clear();
+            state.labels.Clear();
+            state.visible_labels.Clear();
+            state.left_column.pages.Clear();
+            state.right_column.pages.Clear();
+            state.left_column.page_index = state.right_column.page_index = 0;
+            state.column_source_valid = false;
+            state.floating_origin_valid = false;
+            state.floating_focus_object = null;
         }
     }
 
-    private static bool IsMouseNearCurrentBone(SceneView sceneView, SceneViewState state, bool actual_hit_only)
+    private static bool is_visible_transform(Transform bone)
     {
-        if (!state.has_mouse_position || sceneView.camera == null)
-            return false;
-
-        foreach (Transform bone in state.ordered_bones)
-        {
-            if (bone == null || !bone.gameObject.activeInHierarchy)
-                continue;
-            Vector3 position = bone.position;
-            if (!IsDepthVisible(sceneView.camera, position, out float depth))
-                continue;
-            Vector2 point = HandleUtility.WorldToGUIPoint(position);
-            float center_distance = Vector2.Distance(state.mouse_position, point);
-            if (actual_hit_only)
-            {
-                if (show_bone_spheres_near_cursor_only && center_distance > cursor_radius_pixels)
-                    continue;
-                float radius = HandleUtility.GetHandleSize(position) * bone_sphere_size * 0.5f;
-                if (HandleUtility.DistanceToCircle(position, radius) <= bone_sphere_pick_padding_pixels)
-                    return true;
-            }
-            else if (center_distance <= cursor_radius_pixels + 12f)
-            {
-                return true;
-            }
-        }
-        return false;
+        return bone != null && bone.gameObject.activeInHierarchy &&
+            (bone.gameObject.hideFlags & HideFlags.HideInHierarchy) == 0 &&
+            !SceneVisibilityManager.instance.IsHidden(bone.gameObject) &&
+            (Tools.visibleLayers & (1 << bone.gameObject.layer)) != 0;
     }
 
     private static bool IsDepthVisible(Camera camera, Vector3 world_position, out float depth)
@@ -628,91 +674,74 @@ public static class DisplayChildNamesInScene
             (maxDepth <= 0f || depth <= maxDepth);
     }
 
-    private static bool IsMouseInLabelHoldArea(Vector2 mousePosition, SceneViewState state)
+    private static bool try_get_bone_segment(Camera camera, Transform bone, HashSet<Transform> targets,
+        out Vector3 start, out Vector3 end)
     {
-        foreach (LabelDisplayInfo label in state.labels)
+        start = end = default;
+        if (!is_visible_transform(bone) || bone.parent == null ||
+            !targets.Contains(bone.parent) || !is_visible_transform(bone.parent))
+            return false;
+        Vector3 parent_position = bone.parent.position;
+        Vector3 child_position = bone.position;
+        if ((child_position - parent_position).sqrMagnitude < 0.00000001f)
+            return false;
+        float parent_depth = camera.WorldToScreenPoint(parent_position).z;
+        float child_depth = camera.WorldToScreenPoint(child_position).z;
+        if (float.IsNaN(parent_depth) || float.IsNaN(child_depth) ||
+            float.IsInfinity(parent_depth) || float.IsInfinity(child_depth))
+            return false;
+        float near_depth = camera.nearClipPlane;
+        float far_depth = maxDepth > 0f ? Mathf.Min(maxDepth, camera.farClipPlane) : camera.farClipPlane;
+        if (far_depth < near_depth)
+            return false;
+        float depth_delta = child_depth - parent_depth;
+        float start_t = 0f;
+        float end_t = 1f;
+        if (Mathf.Abs(depth_delta) < 0.000001f)
         {
-            if (ExpandRect(label.block_rect, label_hold_radius_pixels * 0.25f).Contains(mousePosition))
-                return true;
+            if (parent_depth < near_depth || parent_depth > far_depth)
+                return false;
         }
-        return false;
-    }
-
-    private static bool ShouldUpdatePickedBoneFilter(Event e)
-    {
-        // Native picking is deliberately restricted to actual mouse motion.
-        // Layout/Repaint/drag/navigation only reuse the last renderer/bone cache.
-        return e.type == EventType.MouseMove;
-    }
-
-    private static HashSet<Transform> BuildPickedBoneFilter(SkinnedMeshRenderer renderer)
-    {
-        if (renderer == null)
-            return null;
-        HashSet<Transform> bones = new HashSet<Transform>();
-        AddBoneToFilter(bones, renderer.rootBone);
-        foreach (Transform bone in renderer.bones)
-            AddBoneToFilter(bones, bone);
-        return bones.Count > 0 ? bones : null;
-    }
-
-    private static SkinnedMeshRenderer FindPickedSkinnedMeshRenderer(Vector2 mousePosition)
-    {
-        // Keep the safety gate at the native API boundary as well as the caller.
-        if (Event.current == null || Event.current.type != EventType.MouseMove)
-            return null;
-#if UNITY_2023_2_OR_NEWER
-        List<UnityEngine.Object> overlapping_objects = new List<UnityEngine.Object>();
-        HandleUtility.GetOverlappingObjects(mousePosition, overlapping_objects);
-        foreach (UnityEngine.Object overlapping_object in overlapping_objects)
+        else
         {
-            SkinnedMeshRenderer renderer = FindSkinnedMeshRenderer(overlapping_object);
-            if (renderer != null)
+            float near_t = (near_depth - parent_depth) / depth_delta;
+            float far_t = (far_depth - parent_depth) / depth_delta;
+            start_t = Mathf.Max(0f, Mathf.Min(near_t, far_t));
+            end_t = Mathf.Min(1f, Mathf.Max(near_t, far_t));
+            if (start_t >= end_t)
+                return false;
+        }
+        // Clip a crossing bone instead of dropping the visible half or drawing behind the camera.
+        start = Vector3.Lerp(parent_position, child_position, start_t);
+        end = Vector3.Lerp(parent_position, child_position, end_t);
+        return true;
+    }
+
+    private static void draw_bone_hierarchy(SceneView scene_view, SceneViewState state)
+    {
+        if (!show_bone_hierarchy || Event.current.type != EventType.Repaint ||
+            scene_view.camera == null || state.bones == null)
+            return;
+        Color previous_color = Handles.color;
+        CompareFunction previous_z_test = Handles.zTest;
+        try
+        {
+            Handles.zTest = CompareFunction.Always;
+            foreach (Transform bone in state.ordered_bones)
             {
-                return renderer;
+                if (!try_get_bone_segment(scene_view.camera, bone, state.bones,
+                    out bone_line_points[0], out bone_line_points[1]))
+                    continue;
+                bool selected = Selection.Contains(bone.gameObject) || Selection.Contains(bone.parent.gameObject);
+                Handles.color = selected ? Handles.selectedColor : new Color(0.3f, 0.85f, 1f, 0.55f);
+                Handles.DrawAAPolyLine(selected ? 2.5f : 1.5f, bone_line_points);
             }
         }
-#endif
-
-        return FindSkinnedMeshRenderer(HandleUtility.PickGameObject(mousePosition, false));
-    }
-
-    private static SkinnedMeshRenderer FindSkinnedMeshRenderer(UnityEngine.Object pickedObject)
-    {
-        GameObject picked_game_object = GetPickedGameObject(pickedObject);
-        if (picked_game_object == null)
+        finally
         {
-            return null;
+            Handles.color = previous_color;
+            Handles.zTest = previous_z_test;
         }
-
-        SkinnedMeshRenderer picked_renderer = picked_game_object.GetComponent<SkinnedMeshRenderer>();
-        if (picked_renderer != null)
-        {
-            return picked_renderer;
-        }
-
-        picked_renderer = picked_game_object.GetComponentInParent<SkinnedMeshRenderer>();
-        if (picked_renderer != null)
-        {
-            return picked_renderer;
-        }
-
-        return picked_game_object.GetComponentInChildren<SkinnedMeshRenderer>();
-    }
-
-    private static GameObject GetPickedGameObject(UnityEngine.Object pickedObject)
-    {
-        if (pickedObject is GameObject game_object)
-        {
-            return game_object;
-        }
-
-        if (pickedObject is Component component)
-        {
-            return component.gameObject;
-        }
-
-        return null;
     }
 
     private static void DrawBoneSpheres(SceneView sceneView, SceneViewState state, int control_id)
@@ -761,7 +790,7 @@ public static class DisplayChildNamesInScene
 
         foreach (Transform bone in state.ordered_bones)
         {
-            if (bone == null || !bone.gameObject.activeInHierarchy)
+            if (!is_visible_transform(bone))
                 continue;
 
             Vector3 position = bone.position;
@@ -884,14 +913,6 @@ public static class DisplayChildNamesInScene
             Selection.activeGameObject = gameObject;
     }
 
-    private static void AddBoneToFilter(HashSet<Transform> bones, Transform bone)
-    {
-        if (bone != null)
-        {
-            bones.Add(bone);
-        }
-    }
-
     // Compact settings UI. Existing fields/keys are retained; v6 adds page count and optional height cap.
     // Sizes below are GUI points; Unity applies the editor's display scaling.
     internal const float SettingsPanelWidth = 340f;
@@ -940,7 +961,7 @@ public static class DisplayChildNamesInScene
                     Rect header = GetCompactSettingsRow();
                     bool enabled = EditorGUI.ToggleLeft(
                         new Rect(header.x, header.y, 84f, header.height),
-                        new GUIContent("有効", "ボーン名・ラベル・スフィア表示を切り替えます。"), isEnabled);
+                        new GUIContent("有効", "ボーン名・ラベル・階層線・スフィア表示を切り替えます。"), isEnabled);
                     if (enabled != isEnabled)
                         SetEnabled(enabled);
                     using (new EditorGUI.DisabledScope(!two_column_layout))
@@ -977,7 +998,7 @@ public static class DisplayChildNamesInScene
                         ClampAlphaRange();
                         label_hold_radius_pixels = Mathf.Clamp(label_hold_radius_pixels, 16f, 480f);
                         maxDepth = SanitizeMaxDepth(maxDepth);
-                        bone_sphere_size = Mathf.Clamp(bone_sphere_size, 0.01f, 0.3f);
+                        bone_sphere_size = Mathf.Clamp(bone_sphere_size, 0.01f, max_bone_sphere_size);
                         SanitizeColumnSettings();
 
                         GUILayout.Space(5f);
@@ -1014,7 +1035,6 @@ public static class DisplayChildNamesInScene
         {
             foreach (SceneViewState state in scene_view_states.Values)
             {
-                state.pick_dirty = true;
                 state.column_content_dirty = true;
                 if (!show_bone_spheres || !enable_bone_sphere_click_selection)
                     state.cancel_requested = true;
@@ -1035,15 +1055,17 @@ public static class DisplayChildNamesInScene
         show_vrc_phys_bone_components = CompactSettingsToggle("PhysBone系を表示", show_vrc_phys_bone_components,
             "VRCPhysBone・VRCPhysBoneCollider・RootRefとチェックボックスを表示します。");
         GUILayout.Space(3f);
+        show_bone_hierarchy = CompactSettingsToggle("ボーン階層（親子線）", show_bone_hierarchy,
+            "シーン内のTransformの親子を線で結びます。未使用・補助ボーンを含み、SkinnedMeshRendererで絞り込みません。");
         show_bone_spheres = CompactSettingsToggle("ボーン位置スフィア", show_bone_spheres,
-            "ボーンの位置にスフィアを描画します。");
+            "シーン内のTransformの位置にスフィアを描画します。");
         using (new EditorGUI.DisabledScope(!show_bone_spheres))
         {
             show_bone_spheres_near_cursor_only = CompactSettingsToggle("カーソル周辺のみ表示", show_bone_spheres_near_cursor_only,
                 "スフィアの表示をカーソル半径内に限定します。");
             enable_bone_sphere_click_selection = CompactSettingsToggle("スフィアクリックで選択", enable_bone_sphere_click_selection,
                 "表示中のスフィアを左クリックすると、そのボーンを選択します。");
-            bone_sphere_size = CompactSettingsSlider("スフィアサイズ", bone_sphere_size, 0.01f, 0.3f,
+            bone_sphere_size = CompactSettingsSlider("スフィアサイズ", bone_sphere_size, 0.01f, max_bone_sphere_size,
                 "スフィアの描画サイズ。表示倍率に応じたハンドルサイズへの倍率です。");
         }
     }
@@ -1296,7 +1318,7 @@ public static class DisplayChildNamesInScene
         }
         else
         {
-            state.column_candidates.RemoveAll(c => c.gameObject == null || !c.gameObject.activeInHierarchy);
+            state.column_candidates.RemoveAll(c => c.gameObject == null || !is_visible_transform(c.gameObject.transform));
             foreach (LabelCandidate c in state.column_candidates)
             {
                 Vector2 anchor = HandleUtility.WorldToGUIPoint(c.gameObject.transform.position);
@@ -1320,7 +1342,7 @@ public static class DisplayChildNamesInScene
         Rect viewport = GetColumnViewport(sceneView);
         bool hold_targets = ShouldHoldColumnTargets(state);
         bool geometry_changed = viewport != state.column_viewport || !state.column_layout_active || state.floating_layout_active;
-        bool stale = state.column_candidates.Any(c => c.gameObject == null || !c.gameObject.activeInHierarchy);
+        bool stale = state.column_candidates.Any(c => c.gameObject == null || !is_visible_transform(c.gameObject.transform));
         if (hold_targets && !geometry_changed && !state.column_content_dirty && !stale)
         {
             // Freeze membership, rectangles and control order, not the live leader endpoints.
@@ -1388,7 +1410,7 @@ public static class DisplayChildNamesInScene
         Rect viewport = GetColumnViewport(view);
         bool hold = ShouldHoldColumnTargets(state);
         bool geometry_changed = viewport != state.column_viewport || !state.column_layout_active || !state.floating_layout_active;
-        bool stale = state.column_candidates.Any(c => c.gameObject == null || !c.gameObject.activeInHierarchy);
+        bool stale = state.column_candidates.Any(c => c.gameObject == null || !is_visible_transform(c.gameObject.transform));
         if (hold && !geometry_changed && !state.column_content_dirty && !stale && !state.column_layout_too_small)
         {
             ApplyVisibleColumnPages(state);
@@ -1989,19 +2011,33 @@ public static class DisplayChildNamesInScene
             DrawColumnHeader(sceneView, state.left_column, true);
             DrawColumnHeader(sceneView, state.right_column, false);
         }
+        if (object_name_style == null)
+        {
+            object_name_style = new GUIStyle(EditorStyles.label)
+            {
+                clipping = TextClipping.Clip, wordWrap = false
+            };
+            transform_icon = EditorGUIUtility.ObjectContent(null, typeof(Transform)).image;
+        }
+        GUIStyle style = object_name_style;
+        style.fontSize = fontSize;
         foreach (LabelDisplayInfo label in state.labels)
         {
             bool hovered = label.block_rect.Contains(state.mouse_position);
             float alpha = hovered ? Mathf.Max(0.9f, label.alpha) : label.alpha;
-            GUIStyle style = new GUIStyle(EditorStyles.label)
-            {
-                fontSize = fontSize, clipping = TextClipping.Clip, wordWrap = false
-            };
             style.normal.textColor = new Color(labelColor.r, labelColor.g, labelColor.b, alpha);
             string name = label.gameObject != null ? label.gameObject.name : "Missing Object";
             if (label.continuation)
                 name += " (続き)";
-            EditorGUI.LabelField(label.label_rect, new GUIContent(name, name), style);
+            if (label.is_column_label)
+            {
+                EditorGUI.LabelField(label.label_rect, new GUIContent(name, transform_icon,
+                    name + " (Transform)\nクリックで選択。ドラッグしてインスペクターのTransform欄へ割り当て。"), style);
+                if (!e.alt && !Tools.viewToolActive)
+                    EditorGUIUtility.AddCursorRect(label.label_rect, MouseCursor.MoveArrow);
+            }
+            else
+                EditorGUI.LabelField(label.label_rect, new GUIContent(name, name), style);
 
             Vector2 component_position = new Vector2(label.label_rect.x, label.label_rect.yMax);
             foreach (ComponentDisplayInfo row in label.components)
@@ -2055,11 +2091,7 @@ public static class DisplayChildNamesInScene
 
     private static IEnumerable<GameObject> GetDisplayTargetObjects(SceneViewState state)
     {
-        if (state.bones != null)
-            return state.ordered_bones.Where(bone => bone != null).Select(bone => bone.gameObject);
-        // Preserve the original fallback to non-bone scene objects.
-        return EditorObjectHelper.FindSceneObjects<GameObject>()
-            .Where(go => go != null).OrderBy(go => go.GetInstanceID());
+        return state.ordered_bones.Where(is_visible_transform).Select(bone => bone.gameObject);
     }
 
     private static int GetNextLabelStackIndex(Dictionary<Vector2Int, int> labelStackCounts, Vector2 guiPos)
@@ -2123,6 +2155,7 @@ public static class DisplayChildNamesInScene
         showSettings = false;
         show_vrc_phys_bone_components = true;
         show_bone_spheres = true;
+        show_bone_hierarchy = true;
         show_bone_spheres_near_cursor_only = true;
         enable_bone_sphere_click_selection = false;
         cursor_radius_pixels = default_cursor_radius_pixels;
@@ -2155,12 +2188,13 @@ public static class DisplayChildNamesInScene
         showSettings = SessionState.GetBool(session_key_show_settings, false);
         show_vrc_phys_bone_components = SessionState.GetBool(session_key_show_vrc_phys_bone_components, true);
         show_bone_spheres = SessionState.GetBool(session_key_show_bone_spheres, true);
+        show_bone_hierarchy = SessionState.GetBool(session_key_show_bone_hierarchy, true);
         show_bone_spheres_near_cursor_only = SessionState.GetBool(session_key_show_bone_spheres_near_cursor_only, true);
         enable_bone_sphere_click_selection = SessionState.GetBool(session_key_enable_bone_sphere_click_selection, false);
         cursor_radius_pixels = SessionState.GetFloat(session_key_cursor_radius_pixels, default_cursor_radius_pixels);
         label_hold_radius_pixels = Mathf.Clamp(SessionState.GetFloat(session_key_label_hold_radius_pixels, default_label_hold_radius_pixels), 16f, 480f);
         maxDepth = SanitizeMaxDepth(SessionState.GetFloat(session_key_max_depth, default_max_depth));
-        bone_sphere_size = Mathf.Clamp(SessionState.GetFloat(session_key_bone_sphere_size, default_bone_sphere_size), 0.01f, 0.3f);
+        bone_sphere_size = Mathf.Clamp(SessionState.GetFloat(session_key_bone_sphere_size, default_bone_sphere_size), 0.01f, max_bone_sphere_size);
         guiOffset = GetSessionVector2(session_key_gui_offset_x, session_key_gui_offset_y, default_gui_offset);
         fontSize = SessionState.GetInt(session_key_font_size, default_font_size);
         labelColor = GetSessionColor(default_label_color);
@@ -2188,12 +2222,13 @@ public static class DisplayChildNamesInScene
         SessionState.SetBool(session_key_show_settings, showSettings);
         SessionState.SetBool(session_key_show_vrc_phys_bone_components, show_vrc_phys_bone_components);
         SessionState.SetBool(session_key_show_bone_spheres, show_bone_spheres);
+        SessionState.SetBool(session_key_show_bone_hierarchy, show_bone_hierarchy);
         SessionState.SetBool(session_key_show_bone_spheres_near_cursor_only, show_bone_spheres_near_cursor_only);
         SessionState.SetBool(session_key_enable_bone_sphere_click_selection, enable_bone_sphere_click_selection);
         SessionState.SetFloat(session_key_cursor_radius_pixels, cursor_radius_pixels);
         SessionState.SetFloat(session_key_label_hold_radius_pixels, Mathf.Clamp(label_hold_radius_pixels, 16f, 480f));
         SessionState.SetFloat(session_key_max_depth, SanitizeMaxDepth(maxDepth));
-        SessionState.SetFloat(session_key_bone_sphere_size, Mathf.Clamp(bone_sphere_size, 0.01f, 0.3f));
+        SessionState.SetFloat(session_key_bone_sphere_size, Mathf.Clamp(bone_sphere_size, 0.01f, max_bone_sphere_size));
         SetSessionVector2(session_key_gui_offset_x, session_key_gui_offset_y, guiOffset);
         SessionState.SetInt(session_key_font_size, fontSize);
         SetSessionColor(labelColor);
