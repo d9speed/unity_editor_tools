@@ -1,4 +1,4 @@
-// Column page size v6, based on compact settings v5.
+// One column per prefab instance. Both columns and their Transform rows paginate.
 // 1-30 object blocks per column/page. Nearby panel height follows the actual pages.
 // Screen bounds always apply; the previous pixel height cap is now optional.
 // No camera-driven repaint loop. Scene Transform discovery is cached between hierarchy changes.
@@ -87,6 +87,10 @@ public static class DisplayChildNamesInScene
     private static readonly int column_label_control_hash = "DisplayChildNamesInSceneTransformLabel".GetHashCode();
     private static GUIStyle object_name_style;
     private static Texture transform_icon;
+    private static GUIStyle prefab_header_style;
+    private static GUIStyle column_count_style;
+    private static Texture prefab_icon;
+    private static float prefab_header_height => label_height + 4f;
     private static readonly Vector3[] bone_line_points = new Vector3[2];
     private static readonly BindingFlags component_member_flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
@@ -131,6 +135,7 @@ public static class DisplayChildNamesInScene
     private sealed class LabelCandidate
     {
         public GameObject gameObject;
+        public GameObject prefab_root;
         public Vector2 anchor;
         public float alpha;
         public List<ComponentDisplayInfo> components;
@@ -138,6 +143,9 @@ public static class DisplayChildNamesInScene
 
     private sealed class LabelColumn
     {
+        public GameObject prefab_root;
+        public int prefab_key;
+        public readonly List<LabelCandidate> candidates = new List<LabelCandidate>();
         public Rect panel_rect;
         public Rect body_rect;
         public int page_index;
@@ -149,6 +157,9 @@ public static class DisplayChildNamesInScene
     private class LabelDisplayInfo
     {
         public GameObject gameObject;
+        public GameObject prefab_root;
+        public bool show_prefab_header;
+        public Rect prefab_header_rect;
         public Vector2 anchor_gui_position;
         public Rect block_rect;
         public Rect label_rect;
@@ -218,9 +229,12 @@ public static class DisplayChildNamesInScene
         public Rect column_label_mouse_down_rect;
         public Vector2 column_label_mouse_down_position;
         public readonly List<LabelCandidate> column_candidates = new List<LabelCandidate>();
-        public readonly Dictionary<int, bool> column_sides = new Dictionary<int, bool>();
-        public readonly LabelColumn left_column = new LabelColumn();
-        public readonly LabelColumn right_column = new LabelColumn();
+        public readonly List<LabelColumn> prefab_columns = new List<LabelColumn>();
+        public readonly List<LabelColumn> visible_columns = new List<LabelColumn>();
+        public int column_set_page;
+        public int pending_column_set_page = -1;
+        public int columns_per_page = 1;
+        public Rect column_set_pager_rect;
         public bool column_layout_active;
         public bool column_layout_too_small;
         public bool column_content_dirty = true;
@@ -368,7 +382,7 @@ public static class DisplayChildNamesInScene
                 DisplayObjectNames(sceneView, state);
                 // Child controls receive the event first. Empty panel/gutter pixels
                 // must not select/zoom the mesh underneath the floating panel.
-                if (state.floating_layout_active && IsPointerOverColumns(state, e.mousePosition) &&
+                if (state.column_layout_active && IsPointerOverColumns(state, e.mousePosition) &&
                     !e.alt && !Tools.viewToolActive && GUIUtility.hotControl == 0 &&
                     ((e.type == EventType.MouseDown && e.button == 0) || e.type == EventType.ScrollWheel))
                     e.Use();
@@ -540,7 +554,10 @@ public static class DisplayChildNamesInScene
                 state.visible_labels.Clear();
                 state.labels.Clear();
                 state.column_candidates.Clear();
-                state.column_sides.Clear();
+                state.prefab_columns.Clear();
+                clear_column_display(state);
+                state.column_set_page = 0;
+                state.pending_column_set_page = -1;
                 state.column_layout_active = false;
                 state.column_source_valid = false;
                 state.floating_layout_active = false;
@@ -646,12 +663,10 @@ public static class DisplayChildNamesInScene
         if (stage_changed)
         {
             state.column_candidates.Clear();
-            state.column_sides.Clear();
-            state.labels.Clear();
-            state.visible_labels.Clear();
-            state.left_column.pages.Clear();
-            state.right_column.pages.Clear();
-            state.left_column.page_index = state.right_column.page_index = 0;
+            state.prefab_columns.Clear();
+            clear_column_display(state);
+            state.column_set_page = 0;
+            state.pending_column_set_page = -1;
             state.column_source_valid = false;
             state.floating_origin_valid = false;
             state.floating_focus_object = null;
@@ -924,7 +939,7 @@ public static class DisplayChildNamesInScene
     private static readonly GUIContent[] settings_tabs =
     {
         new GUIContent("表示範囲", "検出範囲・最大深度・スフィア・PhysBone系表示"),
-        new GUIContent("ラベル配置", "近傍パネル・2カラム・距離・幅・余白"),
+        new GUIContent("ラベル配置", "プレハブ別カラム・近傍パネル・距離・幅・余白"),
         new GUIContent("文字・色", "文字サイズ・色・透明度")
     };
 
@@ -968,7 +983,7 @@ public static class DisplayChildNamesInScene
                     {
                         pin_column_labels = EditorGUI.ToggleLeft(
                             new Rect(header.x + 104f, header.y, header.width - 104f, header.height),
-                            new GUIContent("ラベル固定", "現在の表示対象と配置を保持します。2カラム／近傍パネル用です。"),
+                            new GUIContent("ラベル固定", "現在の表示対象と配置を保持します。プレハブ別カラム用です。"),
                             pin_column_labels);
                     }
 
@@ -1072,15 +1087,15 @@ public static class DisplayChildNamesInScene
 
     private static void DrawCompactPlacementSettings()
     {
-        two_column_layout = CompactSettingsToggle("左右2カラムに配置", two_column_layout,
-            "OFFで従来のボーン近傍ラベル配置に戻します。");
+        two_column_layout = CompactSettingsToggle("プレハブごとにカラム配置", two_column_layout,
+            "プレハブ1つにつき1列で表示します。画面に収まらない列は上部の < > で切り替えます。\nOFFで従来のボーン近傍ラベル配置に戻します。");
         if (two_column_layout)
         {
             column_items_per_page = EditorGUI.IntSlider(
                 CompactSettingsFieldRect("1列の表示数", "1列・1ページの上限（1〜30件）。ボーン名1つを1件とし、PhysBoneなどの行は件数に含めません。\n超過分は各列上部の < > で切り替えます。画面に収まらない場合は、この件数より手前で分割します。"),
                 column_items_per_page, 1, max_column_items_per_page);
             floating_column_layout = CompactSettingsToggle("ボーン近くにまとめる", floating_column_layout,
-                "ONで2列を近傍パネルにまとめ、OFFで画面端に配置します。\nパネルへ移動中とパネル上では対象と配置を保持します。");
+                "ONで各列を近傍パネルにまとめ、OFFで画面端に配置します。\nパネルへ移動中とパネル上では対象と配置を保持します。");
             if (floating_column_layout)
             {
                 floating_panel_offset = CompactSettingsPair("パネル距離(px)", floating_panel_offset, "X", "Y",
@@ -1090,7 +1105,7 @@ public static class DisplayChildNamesInScene
                 if (floating_limit_height)
                     floating_panel_max_height = CompactSettingsSlider("パネル高さ上限(px)", floating_panel_max_height, 120f, 800f,
                         "表示件数と高さのうち、先に上限へ達した位置でページ分割します。");
-                floating_column_spacing = CompactSettingsSlider("2列の間隔(px)", floating_column_spacing, 2f, 32f);
+                floating_column_spacing = CompactSettingsSlider("カラム間隔(px)", floating_column_spacing, 2f, 32f);
                 floating_all_leaders = CompactSettingsToggle("全ラベルの引出線", floating_all_leaders,
                     "OFFでは通常1本。ラベル上にマウスを置くと対応先が切り替わります。");
             }
@@ -1106,7 +1121,7 @@ public static class DisplayChildNamesInScene
             guiOffset = CompactSettingsPair("表示オフセット(px)", guiOffset, "X", "Y");
         else if (!floating_column_layout)
             guiOffset.y = CompactSettingsFloat("縦オフセット(px)", guiOffset.y,
-                "画面端2カラムではYだけ使用します。Xの保存値は変更しません。");
+                "画面端のカラムではYだけ使用します。Xの保存値は変更しません。");
     }
 
     private static void DrawCompactAppearanceSettings()
@@ -1209,8 +1224,8 @@ public static class DisplayChildNamesInScene
             return false;
         if (state.floating_layout_active)
             return state.column_candidates.Count > 0 && state.floating_panel_rect.Contains(point);
-        return (state.left_column.pages.Count > 0 && state.left_column.panel_rect.Contains(point)) ||
-               (state.right_column.pages.Count > 0 && state.right_column.panel_rect.Contains(point));
+        return state.column_set_pager_rect.Contains(point) ||
+            state.visible_columns.Any(column => column.panel_rect.Contains(point));
     }
 
     private static bool ShouldHoldColumnTargets(SceneViewState state)
@@ -1230,8 +1245,8 @@ public static class DisplayChildNamesInScene
             return false;
         // Widening corridors connect the cluster's edge to the full column.
         // Inside the source rectangle, normal hover inspection always resumes.
-        return IsInColumnTransferCorridor(mouse, state.column_source_rect, state.left_column, true) ||
-               IsInColumnTransferCorridor(mouse, state.column_source_rect, state.right_column, false);
+        return state.visible_columns.Any(column => IsInColumnTransferCorridor(mouse,
+            state.column_source_rect, column, column.panel_rect.center.x < state.column_source_rect.center.x));
     }
 
     private static bool IsInColumnTransferCorridor(Vector2 point, Rect source, LabelColumn column, bool left)
@@ -1272,10 +1287,7 @@ public static class DisplayChildNamesInScene
             RebuildLocalLabelLayout(sceneView, state);
             return;
         }
-        if (floating_column_layout)
-            RebuildFloatingColumnLayout(sceneView, state);
-        else
-            RebuildEdgeColumnLayout(sceneView, state);
+        rebuild_prefab_column_layout(sceneView, state, floating_column_layout);
     }
 
     private static bool RefreshColumnCandidates(SceneView sceneView, SceneViewState state, Rect viewport, bool hold_targets)
@@ -1299,6 +1311,7 @@ public static class DisplayChildNamesInScene
                 next.Add(new LabelCandidate
                 {
                     gameObject = go, anchor = anchor, alpha = alpha,
+                    prefab_root = get_prefab_group_root(go),
                     components = GetDisplayComponentSnapshot(go, alpha)
                 });
             }
@@ -1308,6 +1321,7 @@ public static class DisplayChildNamesInScene
             if (!reset_pages)
                 for (int i = 0; i < next.Count; i++)
                     if (next[i].gameObject != state.column_candidates[i].gameObject ||
+                        next[i].prefab_root != state.column_candidates[i].prefab_root ||
                         next[i].components.Count != state.column_candidates[i].components.Count)
                     {
                         reset_pages = true;
@@ -1318,7 +1332,7 @@ public static class DisplayChildNamesInScene
         }
         else
         {
-            state.column_candidates.RemoveAll(c => c.gameObject == null || !is_visible_transform(c.gameObject.transform));
+            reset_pages = state.column_candidates.RemoveAll(c => c.gameObject == null || !is_visible_transform(c.gameObject.transform)) > 0;
             foreach (LabelCandidate c in state.column_candidates)
             {
                 Vector2 anchor = HandleUtility.WorldToGUIPoint(c.gameObject.transform.position);
@@ -1326,7 +1340,12 @@ public static class DisplayChildNamesInScene
                     !float.IsInfinity(anchor.x) && !float.IsInfinity(anchor.y))
                     c.anchor = anchor;
                 if (state.column_content_dirty)
+                {
                     c.components = GetDisplayComponentSnapshot(c.gameObject, c.alpha);
+                    GameObject prefab_root = get_prefab_group_root(c.gameObject);
+                    reset_pages |= prefab_root != c.prefab_root;
+                    c.prefab_root = prefab_root;
+                }
             }
         }
         state.column_content_dirty = false;
@@ -1334,177 +1353,162 @@ public static class DisplayChildNamesInScene
         return reset_pages;
     }
 
-    private static void RebuildEdgeColumnLayout(SceneView sceneView, SceneViewState state)
-    {
-        if (sceneView.camera == null || !state.has_mouse_position)
-            return;
-
-        Rect viewport = GetColumnViewport(sceneView);
-        bool hold_targets = ShouldHoldColumnTargets(state);
-        bool geometry_changed = viewport != state.column_viewport || !state.column_layout_active || state.floating_layout_active;
-        bool stale = state.column_candidates.Any(c => c.gameObject == null || !is_visible_transform(c.gameObject.transform));
-        if (hold_targets && !geometry_changed && !state.column_content_dirty && !stale)
-        {
-            // Freeze membership, rectangles and control order, not the live leader endpoints.
-            ApplyVisibleColumnPages(state);
-            return;
-        }
-
-        SanitizeColumnSettings();
-        state.floating_layout_active = false;
-        state.floating_origin_valid = false;
-        state.column_viewport = viewport;
-        state.column_layout_active = true;
-        float width = Mathf.Min(column_width, (viewport.width - column_inset * 2f - column_center_gap) * 0.5f);
-        float panel_height = viewport.height - column_vertical_margins.x - column_vertical_margins.y;
-        float body_height = panel_height - column_header_height - column_gap;
-        // Need room for a title + at least one component, including panel padding.
-        state.column_layout_too_small = width < 140f ||
-            body_height < label_height + component_row_height + column_padding * 2f;
-        if (state.column_layout_too_small)
-        {
-            state.labels.Clear();
-            state.visible_labels.Clear();
-            state.left_column.pages.Clear();
-            state.right_column.pages.Clear();
-            return;
-        }
-        ConfigureColumn(state.left_column, column_inset, width, panel_height, body_height);
-        ConfigureColumn(state.right_column, viewport.width - column_inset - width, width, panel_height, body_height);
-
-        bool reset_pages = RefreshColumnCandidates(sceneView, state, viewport, hold_targets);
-
-        var left = new List<LabelCandidate>();
-        var right = new List<LabelCandidate>();
-        SplitColumnCandidates(state, left, right, viewport.center.x);
-        if (reset_pages)
-        {
-            state.left_column.page_index = 0;
-            state.right_column.page_index = 0;
-        }
-        BuildColumnPages(state.left_column, left, true);
-        BuildColumnPages(state.right_column, right, false);
-        ApplyVisibleColumnPages(state);
-
-        if (!hold_targets || !state.column_source_valid)
-        {
-            state.column_source_valid = state.column_candidates.Count > 0;
-            if (state.column_source_valid)
-            {
-                Vector2 min = state.column_candidates[0].anchor;
-                Vector2 max = min;
-                foreach (LabelCandidate c in state.column_candidates)
-                {
-                    min = Vector2.Min(min, c.anchor);
-                    max = Vector2.Max(max, c.anchor);
-                }
-                state.column_source_rect = ExpandRect(Rect.MinMaxRect(min.x, min.y, max.x, max.y), 16f);
-            }
-        }
-    }
-
-    private static void RebuildFloatingColumnLayout(SceneView view, SceneViewState state)
+    private static void rebuild_prefab_column_layout(SceneView view, SceneViewState state, bool floating)
     {
         if (view.camera == null || !state.has_mouse_position)
             return;
         Rect viewport = GetColumnViewport(view);
-        bool hold = ShouldHoldColumnTargets(state);
-        bool geometry_changed = viewport != state.column_viewport || !state.column_layout_active || !state.floating_layout_active;
+        bool changing_columns = state.pending_column_set_page >= 0;
+        bool hold = changing_columns || ShouldHoldColumnTargets(state);
+        bool geometry_changed = viewport != state.column_viewport || !state.column_layout_active ||
+            state.floating_layout_active != floating;
         bool stale = state.column_candidates.Any(c => c.gameObject == null || !is_visible_transform(c.gameObject.transform));
-        if (hold && !geometry_changed && !state.column_content_dirty && !stale && !state.column_layout_too_small)
+        if (hold && !changing_columns && !geometry_changed && !state.column_content_dirty && !stale && !state.column_layout_too_small)
         {
             ApplyVisibleColumnPages(state);
             return;
         }
 
         SanitizeColumnSettings();
-        bool was_floating = state.floating_layout_active;
+        if (state.floating_layout_active != floating)
+            state.floating_origin_valid = false;
         state.column_viewport = viewport;
         state.column_layout_active = true;
-        state.floating_layout_active = true;
-        if (!was_floating)
-            state.floating_origin_valid = false;
+        state.floating_layout_active = floating;
         bool reset_pages = RefreshColumnCandidates(view, state, viewport, hold);
-        if (state.column_candidates.Count == 0)
+        refresh_prefab_columns(state, reset_pages);
+        if (changing_columns)
         {
-            ClearFloatingPages(state);
-            state.column_layout_too_small = false;
+            state.column_set_page = state.pending_column_set_page;
+            state.pending_column_set_page = -1;
+        }
+        layout_prefab_columns(state, viewport, floating, hold);
+    }
+
+    private static void refresh_prefab_columns(SceneViewState state, bool reset_pages)
+    {
+        var previous_order = new Dictionary<int, int>();
+        var previous_columns = new Dictionary<int, LabelColumn>();
+        for (int i = 0; i < state.prefab_columns.Count; i++)
+        {
+            LabelColumn column = state.prefab_columns[i];
+            previous_order[column.prefab_key] = i;
+            previous_columns[column.prefab_key] = column;
+        }
+        var next = new List<LabelColumn>();
+        foreach (var group in state.column_candidates.GroupBy(c => c.prefab_root != null ? c.prefab_root.GetInstanceID() : 0))
+        {
+            if (!previous_columns.TryGetValue(group.Key, out LabelColumn column))
+                column = new LabelColumn { prefab_key = group.Key };
+            column.prefab_root = group.First().prefab_root;
+            column.candidates.Clear();
+            column.candidates.AddRange(group);
+            if (reset_pages)
+                column.page_index = 0;
+            next.Add(column);
+        }
+        // Keep existing columns in place as bones move; insert new groups in spatial order.
+        next = next.OrderBy(column => previous_order.TryGetValue(column.prefab_key, out int order) ? order : int.MaxValue)
+            .ThenBy(column => column.candidates.Min(c => Mathf.RoundToInt(c.anchor.x / 8f)))
+            .ThenBy(column => column.prefab_key).ToList();
+        if (!next.Select(column => column.prefab_key).SequenceEqual(state.prefab_columns.Select(column => column.prefab_key)))
+            state.column_set_page = 0;
+        state.prefab_columns.Clear();
+        state.prefab_columns.AddRange(next);
+    }
+
+    private static void layout_prefab_columns(SceneViewState state, Rect viewport, bool floating, bool hold)
+    {
+        clear_column_display(state);
+        state.column_layout_too_small = false;
+        if (state.prefab_columns.Count == 0)
+        {
+            state.column_set_page = 0;
             state.floating_origin_valid = false;
             state.floating_focus_object = null;
             state.column_source_valid = false;
             return;
         }
-
-        var left = new List<LabelCandidate>();
-        var right = new List<LabelCandidate>();
-        // A single entry starts at the first column, not on the viewport's far side.
-        SplitColumnCandidates(state, left, right, float.MaxValue);
         Rect safe = new Rect(column_inset, column_vertical_margins.x,
             Mathf.Max(0f, viewport.width - column_inset * 2f),
             Mathf.Max(0f, viewport.height - column_vertical_margins.x - column_vertical_margins.y));
-        float width = Mathf.Min(column_width,
-            (safe.width - floating_panel_padding * 2f - floating_column_spacing) * 0.5f);
-        float overhead = floating_panel_padding * 2f + column_header_height + column_gap;
-        float height_budget = floating_limit_height ? Mathf.Min(floating_panel_max_height, safe.height) : safe.height;
+        float padding = floating ? floating_panel_padding : 0f;
+        float spacing = floating ? floating_column_spacing : column_center_gap;
+        float available_width = Mathf.Max(0f, safe.width - padding * 2f);
+        float width = Mathf.Min(column_width, available_width);
+        int slots = Mathf.Min(state.prefab_columns.Count,
+            Mathf.Max(1, Mathf.FloorToInt((available_width + spacing) / (width + spacing))));
+        state.columns_per_page = slots;
+        int set_count = Mathf.CeilToInt((float)state.prefab_columns.Count / slots);
+        state.column_set_page = Mathf.Clamp(state.column_set_page, 0, set_count - 1);
+        float pager_height = set_count > 1 ? column_header_height + column_gap : 0f;
+        float overhead = padding * 2f + pager_height + column_header_height + column_gap;
+        float height_budget = floating && floating_limit_height ? Mathf.Min(floating_panel_max_height, safe.height) : safe.height;
         float capacity = height_budget - overhead;
-        float minimum_body = column_padding * 2f + label_height + component_row_height;
+        float minimum_body = column_padding * 2f + prefab_header_height + label_height + component_row_height;
         state.column_layout_too_small = width < 140f || capacity < minimum_body;
         if (state.column_layout_too_small)
-        {
-            ClearFloatingPages(state);
             return;
-        }
 
-        // Decide membership using the count and the available screen/optional height budget.
-        // Do NOT size from every item across every page: that creates a tall empty panel
-        // for a small page size. Build once, measure the largest page, then pack the SAME pages.
-        ConfigureFloatingColumn(state.left_column, 0f, 0f, width, capacity);
-        ConfigureFloatingColumn(state.right_column, 0f, 0f, width, capacity);
-        if (reset_pages)
+        // Measure all sets once so paging either rows or columns cannot move the buttons.
+        float desired_body = minimum_body;
+        foreach (LabelColumn column in state.prefab_columns)
         {
-            state.left_column.page_index = 0;
-            state.right_column.page_index = 0;
+            ConfigureFloatingColumn(column, 0f, 0f, width, capacity);
+            BuildColumnPages(column, column.candidates, false, compact: floating, deferPacking: true);
+            desired_body = Mathf.Max(desired_body, GetLargestColumnPageHeight(column));
         }
-        BuildColumnPages(state.left_column, left, true, compact: true, deferPacking: true);
-        BuildColumnPages(state.right_column, right, false, compact: true, deferPacking: true);
-
-        UpdateFloatingOrigin(state, hold);
-        float desired_body = Mathf.Max(GetLargestColumnPageHeight(state.left_column), GetLargestColumnPageHeight(state.right_column));
-        // Reserve one stable height for BOTH columns and ALL their pages, so < > stays put.
-        float body_height = Mathf.Min(capacity, Mathf.Max(minimum_body, desired_body));
-        Vector2 panel_size = new Vector2(width * 2f + floating_column_spacing + floating_panel_padding * 2f,
-            body_height + overhead);
-        state.floating_panel_rect = PlaceFloatingPanel(state.floating_origin, state.floating_query_position,
-            panel_size, safe, floating_panel_offset, ref state.floating_quadrant);
-        float x = state.floating_panel_rect.x + floating_panel_padding;
-        float y = state.floating_panel_rect.y + floating_panel_padding;
-        ConfigureFloatingColumn(state.left_column, x, y, width, body_height);
-        ConfigureFloatingColumn(state.right_column, x + width + floating_column_spacing, y, width, body_height);
-        foreach (List<LabelDisplayInfo> page in state.left_column.pages)
-            PackColumnPage(page, state.left_column.body_rect, true);
-        foreach (List<LabelDisplayInfo> page in state.right_column.pages)
-            PackColumnPage(page, state.right_column.body_rect, true);
+        float body_height = floating ? Mathf.Min(capacity, desired_body) : capacity;
+        float panel_width = floating ? slots * width + (slots - 1) * spacing + padding * 2f : safe.width;
+        Rect panel = new Rect(safe.x, safe.y, panel_width, body_height + overhead);
+        if (floating)
+        {
+            UpdateFloatingOrigin(state, hold);
+            panel = PlaceFloatingPanel(state.floating_origin, state.floating_query_position, panel.size,
+                safe, floating_panel_offset, ref state.floating_quadrant);
+            state.floating_panel_rect = panel;
+        }
+        if (set_count > 1)
+            state.column_set_pager_rect = new Rect(panel.x + padding, panel.y + padding,
+                panel.width - padding * 2f, column_header_height);
+        float stride = !floating && slots > 1 ? (safe.width - width) / (slots - 1) : width + spacing;
+        int start = state.column_set_page * slots;
+        int end = Mathf.Min(start + slots, state.prefab_columns.Count);
+        for (int i = start; i < end; i++)
+        {
+            LabelColumn column = state.prefab_columns[i];
+            ConfigureFloatingColumn(column, panel.x + padding + (i - start) * stride,
+                panel.y + padding + pager_height, width, body_height);
+            foreach (List<LabelDisplayInfo> page in column.pages)
+            {
+                PackColumnPage(page, column.body_rect, floating);
+                foreach (LabelDisplayInfo label in page)
+                    label.left_column = column.panel_rect.center.x < viewport.center.x;
+            }
+            state.visible_columns.Add(column);
+        }
         ApplyVisibleColumnPages(state);
 
-        // The floating transfer path uses the original inspection point, not the
-        // latest cursor position (which may now be travelling towards a button).
-        state.column_source_valid = true;
-        Vector2 min = state.column_candidates[0].anchor;
-        Vector2 max = min;
-        foreach (LabelCandidate c in state.column_candidates)
+        if (!hold || !state.column_source_valid)
         {
-            min = Vector2.Min(min, c.anchor);
-            max = Vector2.Max(max, c.anchor);
+            Vector2 min = state.column_candidates[0].anchor;
+            Vector2 max = min;
+            foreach (LabelCandidate c in state.column_candidates)
+            {
+                min = Vector2.Min(min, c.anchor);
+                max = Vector2.Max(max, c.anchor);
+            }
+            state.column_source_valid = true;
+            state.column_source_rect = ExpandRect(Rect.MinMaxRect(min.x, min.y, max.x, max.y), 16f);
         }
-        state.column_source_rect = ExpandRect(Rect.MinMaxRect(min.x, min.y, max.x, max.y), 16f);
     }
 
-    private static void ClearFloatingPages(SceneViewState state)
+    private static void clear_column_display(SceneViewState state)
     {
         state.labels.Clear();
         state.visible_labels.Clear();
-        state.left_column.pages.Clear();
-        state.right_column.pages.Clear();
+        state.visible_columns.Clear();
+        state.column_set_pager_rect = new Rect();
         state.floating_panel_rect = new Rect();
     }
 
@@ -1688,64 +1692,23 @@ public static class DisplayChildNamesInScene
         }
     }
 
-    private static void ConfigureColumn(LabelColumn column, float x, float width, float panelHeight, float bodyHeight)
-    {
-        column.panel_rect = new Rect(x, column_vertical_margins.x, width, panelHeight);
-        column.body_rect = new Rect(x, column_vertical_margins.x + column_header_height + column_gap, width, bodyHeight);
-    }
-
-    private static void SplitColumnCandidates(SceneViewState state, List<LabelCandidate> left,
-        List<LabelCandidate> right, float viewCenter)
-    {
-        // Spatial order + occupied height, not just screen centre: a cluster entirely
-        // on one side can still use BOTH columns. Previous sides add hysteresis.
-        var sorted = new List<LabelCandidate>(state.column_candidates);
-        sorted.Sort((a, b) =>
-        {
-            int order = Mathf.RoundToInt(a.anchor.x / 8f).CompareTo(Mathf.RoundToInt(b.anchor.x / 8f));
-            return order != 0 ? order : a.gameObject.GetInstanceID().CompareTo(b.gameObject.GetInstanceID());
-        });
-        int split = 0;
-        if (sorted.Count == 1)
-            split = sorted[0].anchor.x < viewCenter ? 1 : 0;
-        else if (sorted.Count > 1)
-        {
-            float total = 0f;
-            int switches = 0; // Initially everyone is on the right.
-            foreach (LabelCandidate c in sorted)
-            {
-                total += GetColumnCandidateHeight(c) + column_gap;
-                if (state.column_sides.TryGetValue(c.gameObject.GetInstanceID(), out bool was_left) && was_left)
-                    switches++;
-            }
-            float accumulated = 0f;
-            float best_score = float.PositiveInfinity;
-            for (int i = 0; i < sorted.Count - 1; i++)
-            {
-                LabelCandidate c = sorted[i];
-                accumulated += GetColumnCandidateHeight(c) + column_gap;
-                if (state.column_sides.TryGetValue(c.gameObject.GetInstanceID(), out bool was_left))
-                    switches += was_left ? -1 : 1;
-                float score = Mathf.Abs(total - 2f * accumulated) + switches * label_height * 0.75f;
-                if (score < best_score)
-                {
-                    best_score = score;
-                    split = i + 1;
-                }
-            }
-        }
-        state.column_sides.Clear();
-        for (int i = 0; i < sorted.Count; i++)
-        {
-            bool is_left = i < split;
-            (is_left ? left : right).Add(sorted[i]);
-            state.column_sides[sorted[i].gameObject.GetInstanceID()] = is_left;
-        }
-    }
-
     private static float GetColumnCandidateHeight(LabelCandidate c)
     {
         return column_padding * 2f + label_height + c.components.Count * component_row_height;
+    }
+
+    private static GameObject get_prefab_group_root(GameObject target)
+    {
+        // Added GameObjects can lack a prefab connection of their own. They still
+        // belong to the nearest instance above them in the Transform hierarchy.
+        for (Transform current = target.transform; current != null; current = current.parent)
+        {
+            GameObject root = PrefabUtility.GetNearestPrefabInstanceRoot(current.gameObject);
+            if (root != null)
+                return root;
+        }
+        var stage = PrefabStageUtility.GetCurrentPrefabStage();
+        return stage != null && target.scene == stage.scene ? stage.prefabContentsRoot : null;
     }
 
     private static void BuildColumnPages(LabelColumn column, List<LabelCandidate> candidates, bool left,
@@ -1762,25 +1725,32 @@ public static class DisplayChildNamesInScene
             int order = Mathf.RoundToInt(a.anchor.y / 4f).CompareTo(Mathf.RoundToInt(b.anchor.y / 4f));
             return order != 0 ? order : a.gameObject.GetInstanceID().CompareTo(b.gameObject.GetInstanceID());
         });
+        // Preserve spatial order within each instance and order groups by their
+        // first visible member. Instance identity keeps same-name copies separate.
+        var grouped_candidates = candidates.GroupBy(c => c.prefab_root).SelectMany(group => group);
         float capacity = column.body_rect.height;
         float used = 0f;
         var page = new List<LabelDisplayInfo>();
-        foreach (LabelCandidate c in candidates)
+        foreach (LabelCandidate c in grouped_candidates)
         {
             float full_height = GetColumnCandidateHeight(c);
-            if (full_height <= capacity)
+            bool show_header = page.Count == 0 || page[page.Count - 1].prefab_root != c.prefab_root;
+            float header_height = show_header ? prefab_header_height : 0f;
+            float required = full_height + header_height + (page.Count > 0 ? column_gap : 0f);
+            // A header is part of its first Transform block, so it can never be
+            // orphaned at a page bottom or consume the configured object count.
+            if (page.Count > 0 && (page.Count >= item_limit || used + required > capacity))
             {
-                float required = full_height + (page.Count > 0 ? column_gap : 0f);
-                // A title + all its normal component rows is ONE item, not several rows.
-                // Stop on either count or height. Never publish an empty page.
-                if (page.Count > 0 && (page.Count >= item_limit || used + required > capacity))
-                {
-                    column.pages.Add(page);
-                    page = new List<LabelDisplayInfo>();
-                    used = 0f;
-                }
-                used += full_height + (page.Count > 0 ? column_gap : 0f);
-                page.Add(CreateColumnLabel(c, c.components, left, false));
+                column.pages.Add(page);
+                page = new List<LabelDisplayInfo>();
+                used = 0f;
+                show_header = true;
+                header_height = prefab_header_height;
+            }
+            if (full_height + header_height <= capacity)
+            {
+                used += full_height + header_height + (page.Count > 0 ? column_gap : 0f);
+                page.Add(CreateColumnLabel(c, c.components, left, false, show_header));
                 continue;
             }
             // A single object can have more RootRefs than fit on one screen.
@@ -1791,11 +1761,11 @@ public static class DisplayChildNamesInScene
                 page = new List<LabelDisplayInfo>();
                 used = 0f;
             }
-            int rows_per_page = Mathf.Max(1, Mathf.FloorToInt((capacity - column_padding * 2f - label_height) / component_row_height));
+            int rows_per_page = Mathf.Max(1, Mathf.FloorToInt((capacity - column_padding * 2f - prefab_header_height - label_height) / component_row_height));
             for (int start = 0; start < c.components.Count; start += rows_per_page)
             {
                 int count = Mathf.Min(rows_per_page, c.components.Count - start);
-                page.Add(CreateColumnLabel(c, c.components.GetRange(start, count), left, start > 0));
+                page.Add(CreateColumnLabel(c, c.components.GetRange(start, count), left, start > 0, true));
                 column.pages.Add(page);
                 page = new List<LabelDisplayInfo>();
             }
@@ -1808,14 +1778,26 @@ public static class DisplayChildNamesInScene
         column.page_index = Mathf.Clamp(column.page_index, 0, Mathf.Max(0, column.pages.Count - 1));
     }
 
-    private static LabelDisplayInfo CreateColumnLabel(LabelCandidate c, List<ComponentDisplayInfo> rows, bool left, bool continuation)
+    private static LabelDisplayInfo CreateColumnLabel(LabelCandidate c, List<ComponentDisplayInfo> rows, bool left, bool continuation,
+        bool show_header)
     {
         return new LabelDisplayInfo
         {
             gameObject = c.gameObject, anchor_gui_position = c.anchor, alpha = c.alpha,
+            prefab_root = c.prefab_root, show_prefab_header = show_header,
             components = rows, is_column_label = true, left_column = left, continuation = continuation,
-            block_rect = new Rect(0f, 0f, 0f, column_padding * 2f + label_height + rows.Count * component_row_height)
+            block_rect = new Rect(0f, 0f, 0f, column_padding * 2f + label_height + rows.Count * component_row_height
+                + (show_header ? prefab_header_height : 0f))
         };
+    }
+
+    private static void position_column_label(LabelDisplayInfo label)
+    {
+        Rect block = label.block_rect;
+        label.prefab_header_rect = new Rect(block.x + column_padding, block.y + column_padding,
+            block.width - column_padding * 2f, label.show_prefab_header ? prefab_header_height : 0f);
+        label.label_rect = new Rect(block.x + column_padding, label.prefab_header_rect.yMax,
+            block.width - column_padding * 2f, label_height);
     }
 
     private static void PackColumnPage(List<LabelDisplayInfo> page, Rect bounds, bool compact = false)
@@ -1831,8 +1813,7 @@ public static class DisplayChildNamesInScene
             foreach (LabelDisplayInfo label in page)
             {
                 label.block_rect = new Rect(bounds.x, y, bounds.width, label.block_rect.height);
-                label.label_rect = new Rect(bounds.x + column_padding, y + column_padding,
-                    bounds.width - column_padding * 2f, label_height);
+                position_column_label(label);
                 y += label.block_rect.height + column_gap;
             }
             return;
@@ -1874,8 +1855,7 @@ public static class DisplayChildNamesInScene
             {
                 LabelDisplayInfo label = page[i];
                 label.block_rect = new Rect(bounds.x, baseline + offsets[i], bounds.width, label.block_rect.height);
-                label.label_rect = new Rect(bounds.x + column_padding, label.block_rect.y + column_padding,
-                    bounds.width - column_padding * 2f, label_height);
+                position_column_label(label);
             }
         }
     }
@@ -1884,8 +1864,8 @@ public static class DisplayChildNamesInScene
     {
         state.labels.Clear();
         state.visible_labels.Clear();
-        AddVisibleColumnPage(state, state.left_column);
-        AddVisibleColumnPage(state, state.right_column);
+        foreach (LabelColumn column in state.visible_columns)
+            AddVisibleColumnPage(state, column);
     }
 
     private static void AddVisibleColumnPage(SceneViewState state, LabelColumn column)
@@ -1959,7 +1939,7 @@ public static class DisplayChildNamesInScene
         Event e = Event.current;
         if (state.column_layout_too_small && two_column_layout)
         {
-            GUI.Label(new Rect(8f, 28f, 300f, 40f), "2カラム表示: Sceneビューを広げてください。");
+            GUI.Label(new Rect(8f, 28f, 400f, 40f), "プレハブ別カラム: 表示領域の幅・高さを広げてください。");
             return;
         }
 
@@ -1988,12 +1968,15 @@ public static class DisplayChildNamesInScene
             if (state.floating_layout_active && state.column_candidates.Count > 0)
             {
                 EditorGUI.DrawRect(state.floating_panel_rect, new Color(0.07f, 0.07f, 0.07f, 0.9f));
-                float divider_x = state.left_column.panel_rect.xMax + floating_column_spacing * 0.5f;
-                EditorGUI.DrawRect(new Rect(divider_x, state.floating_panel_rect.y + floating_panel_padding,
-                    1f, state.floating_panel_rect.height - floating_panel_padding * 2f),
-                    new Color(1f, 1f, 1f, 0.16f));
+                for (int i = 0; i + 1 < state.visible_columns.Count; i++)
+                {
+                    Rect column_rect = state.visible_columns[i].panel_rect;
+                    float divider_x = column_rect.xMax + floating_column_spacing * 0.5f;
+                    EditorGUI.DrawRect(new Rect(divider_x, column_rect.y, 1f, column_rect.height),
+                        new Color(1f, 1f, 1f, 0.16f));
+                }
             }
-            // Backgrounds on both columns conceal crossing leaders in the text area.
+            // Column backgrounds conceal crossing leaders in the text area.
             foreach (LabelDisplayInfo label in state.labels)
             {
                 if (label.is_column_label)
@@ -2008,8 +1991,9 @@ public static class DisplayChildNamesInScene
 
         if (state.column_layout_active)
         {
-            DrawColumnHeader(sceneView, state.left_column, true);
-            DrawColumnHeader(sceneView, state.right_column, false);
+            draw_column_set_pager(sceneView, state);
+            foreach (LabelColumn column in state.visible_columns)
+                DrawColumnHeader(sceneView, column);
         }
         if (object_name_style == null)
         {
@@ -2031,6 +2015,8 @@ public static class DisplayChildNamesInScene
                 name += " (続き)";
             if (label.is_column_label)
             {
+                if (label.show_prefab_header)
+                    draw_prefab_group_header(label);
                 EditorGUI.LabelField(label.label_rect, new GUIContent(name, transform_icon,
                     name + " (Transform)\nクリックで選択。ドラッグしてインスペクターのTransform欄へ割り当て。"), style);
                 if (!e.alt && !Tools.viewToolActive)
@@ -2051,17 +2037,84 @@ public static class DisplayChildNamesInScene
         }
     }
 
-    private static void DrawColumnHeader(SceneView view, LabelColumn column, bool left)
+    private static void draw_prefab_group_header(LabelDisplayInfo label)
+    {
+        if (prefab_header_style == null)
+        {
+            prefab_header_style = new GUIStyle(EditorStyles.boldLabel)
+            {
+                clipping = TextClipping.Clip, wordWrap = false,
+                alignment = TextAnchor.MiddleLeft
+            };
+            prefab_header_style.normal.textColor = new Color(0.65f, 0.82f, 1f, 1f);
+            prefab_icon = EditorGUIUtility.IconContent("Prefab Icon").image;
+        }
+        prefab_header_style.fontSize = fontSize;
+        Rect rect = label.prefab_header_rect;
+        if (Event.current.type == EventType.Repaint)
+        {
+            EditorGUI.DrawRect(rect, new Color(0.18f, 0.28f, 0.38f, 0.9f));
+            EditorGUI.DrawRect(new Rect(rect.x, rect.yMax - 2f, rect.width, 1f),
+                new Color(0.4f, 0.65f, 0.9f, 0.45f));
+        }
+        bool has_prefab = label.prefab_root != null;
+        string name = has_prefab ? label.prefab_root.name : "非プレハブ";
+        string tooltip = has_prefab
+            ? label.prefab_root.scene.name + "/" + AnimationUtility.CalculateTransformPath(label.prefab_root.transform, null)
+            : "プレハブに属さないTransform";
+        EditorGUI.LabelField(rect, new GUIContent(name, has_prefab ? prefab_icon : null, tooltip), prefab_header_style);
+    }
+
+    private static GUIStyle get_column_count_style()
+    {
+        if (column_count_style == null)
+        {
+            column_count_style = new GUIStyle(EditorStyles.miniLabel);
+            column_count_style.normal.textColor = Color.white;
+        }
+        return column_count_style;
+    }
+
+    private static void draw_column_set_pager(SceneView view, SceneViewState state)
+    {
+        Rect rect = state.column_set_pager_rect;
+        if (rect.height <= 0f)
+            return;
+        if (Event.current.type == EventType.Repaint)
+            EditorGUI.DrawRect(rect, new Color(0.12f, 0.12f, 0.12f, 0.92f));
+        int start = state.column_set_page * state.columns_per_page;
+        int end = Mathf.Min(start + state.columns_per_page, state.prefab_columns.Count);
+        GUI.Label(new Rect(rect.x + 28f, rect.y + 2f, rect.width - 56f, 18f),
+            "プレハブ列 " + (start + 1) + "–" + end + " / " + state.prefab_columns.Count, get_column_count_style());
+        bool navigation = Event.current.alt || Tools.viewToolActive;
+        using (new EditorGUI.DisabledScope(navigation || state.column_set_page == 0))
+        {
+            if (GUI.Button(new Rect(rect.x + 2f, rect.y + 1f, 22f, 20f), new GUIContent("<", "前のプレハブ列")))
+            {
+                state.pending_column_set_page = state.column_set_page - 1;
+                view.Repaint();
+            }
+        }
+        using (new EditorGUI.DisabledScope(navigation || end >= state.prefab_columns.Count))
+        {
+            if (GUI.Button(new Rect(rect.xMax - 24f, rect.y + 1f, 22f, 20f), new GUIContent(">", "次のプレハブ列")))
+            {
+                state.pending_column_set_page = state.column_set_page + 1;
+                view.Repaint();
+            }
+        }
+    }
+
+    private static void DrawColumnHeader(SceneView view, LabelColumn column)
     {
         if (column.pages.Count == 0)
             return;
         Rect rect = new Rect(column.panel_rect.x, column.panel_rect.y, column.panel_rect.width, column_header_height);
         if (Event.current.type == EventType.Repaint)
             EditorGUI.DrawRect(rect, new Color(0.12f, 0.12f, 0.12f, 0.92f));
-        GUIStyle style = new GUIStyle(EditorStyles.miniLabel);
-        style.normal.textColor = Color.white;
+        GUIStyle style = get_column_count_style();
         GUI.Label(new Rect(rect.x + 4f, rect.y + 2f, rect.width - 114f, 18f),
-            (left ? "左 " : "右 ") + column.target_count + "件", style);
+            column.target_count + "件", style);
         float x = rect.xMax - 108f;
         bool navigation = Event.current.alt || Tools.viewToolActive;
         using (new EditorGUI.DisabledScope(navigation || column.page_index <= 0))
