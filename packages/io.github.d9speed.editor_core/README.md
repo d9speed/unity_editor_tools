@@ -24,9 +24,12 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 | Hierarchyの右クリック → メインカメラ関連の2項目 | 対象へカメラを向ける／対象の+Z方向から正対。Undo対応 |
 | `D9speed > Transform Mirror Tool` | X軸方向のミラー複製。左右名・Constraint／PhysBone／Colliderの対称化と作成ペアの事前表示 |
 | `Alt + R` | 選択したシーンオブジェクトのローカルTransformをリセット。Undo対応 |
+| `Ctrl + L`（macOSは`Cmd + L`） | Inspectorのロック／解除を切り替え |
 | Hierarchy | コンポーネントに変更があるPrefabインスタンスのルートへ変更マークを表示 |
 
 Transform Resetの割り当てはUnityのShortcutsにある`Custom/ShortCutEX/TransformReset`で変更できます。
+
+Inspectorのロックは `Edit > Shortcuts` の `Custom/ShortCutEX/InspectorLock` で割り当てを変更できます。初期設定はCtrl+L（macOSはCmd+L）です。同じキーを使う別の操作がある場合は、Shortcutsで割り当てを調整してください。複数のInspectorがある場合は、フォーカス中のInspector、マウス下のInspector、開いているInspectorの先頭の順に1つだけ切り替えます。HierarchyやSceneからも操作でき、Inspectorが開いていない場合は何もしません。
 
 ### Transform MirrorのUI
 

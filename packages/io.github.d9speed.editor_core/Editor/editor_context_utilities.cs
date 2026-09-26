@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEditor.ShortcutManagement;
@@ -13,6 +14,41 @@ namespace D9speed_BaseEditorUtils
 {
 internal static class ShortCutExtension
 {
+    private static readonly Type inspector_window_type = typeof(Editor).Assembly.GetType("UnityEditor.InspectorWindow");
+    private static readonly PropertyInfo inspector_lock_property = inspector_window_type?.GetProperty(
+        "isLocked", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+    [Shortcut("Custom/ShortCutEX/InspectorLock", KeyCode.L, ShortcutModifiers.Action)]
+    private static void toggle_inspector_lock()
+    {
+        if (inspector_lock_property == null || !inspector_lock_property.CanRead || !inspector_lock_property.CanWrite)
+        {
+            Debug.LogWarning("このUnityバージョンではInspectorのロックを切り替えられません。");
+            return;
+        }
+
+        var inspector = find_target_inspector();
+        if (inspector == null) return;
+
+        // Inspector側のプロパティを使い、鍵アイコンと追跡対象も同期する。
+        bool is_locked = (bool)inspector_lock_property.GetValue(inspector);
+        inspector_lock_property.SetValue(inspector, !is_locked);
+        inspector.Repaint();
+    }
+
+    private static EditorWindow find_target_inspector()
+    {
+        var focused_window = EditorWindow.focusedWindow;
+        if (focused_window != null && inspector_window_type.IsInstanceOfType(focused_window))
+            return focused_window;
+
+        var hovered_window = EditorWindow.mouseOverWindow;
+        if (hovered_window != null && inspector_window_type.IsInstanceOfType(hovered_window))
+            return hovered_window;
+
+        return Resources.FindObjectsOfTypeAll(inspector_window_type).OfType<EditorWindow>().FirstOrDefault();
+    }
+
     // ショートカット設定を追加
     [Shortcut("Custom/ShortCutEX/TransformReset", KeyCode.R, ShortcutModifiers.Alt)]
     private static void RunTransformReset()

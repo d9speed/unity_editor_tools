@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8 - 2026-09-26
+
+- Inspectorのロック／解除を切り替えるショートカットを追加。初期設定はCtrl+L（macOSはCmd+L）。UnityのShortcutsの `Custom/ShortCutEX/InspectorLock` から変更可能。
+- フォーカス中、マウス下、開いているInspectorの順に対象を選び、1つだけ切り替え。Inspectorがない場合は何もしません。
+
 ## 0.1.7 - 2026-09-23
 
 - Hierarchyの右クリックに「選択オブジェクト名をコピー」を追加。選択したオブジェクト名をカンマ区切りでクリップボードへコピー。

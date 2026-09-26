@@ -1,5 +1,7 @@
 # D9speed Unity Editor Tools
 
+Editor Core 0.1.8で、Inspectorのロック／解除にCtrl+Lのショートカットを追加しました。UnityのShortcutsの `Custom/ShortCutEX/InspectorLock` から割り当てを変更できます。
+
 Editor Core 0.1.7で、Hierarchyの右クリックに「選択オブジェクト名をコピー」を追加しました。複数選択した名前を `Body,Skirt,Glasses` のようにカンマ区切りでコピーできます。
 
 Editor Core 0.1.6でTransform Mirrorを拡張しました。左右名の交換、Unity／VRC Constraint・PhysBone・Colliderの対称化、最寄りPrefabルートからのDFS探索と作成ペアの2ペイン表示に対応します。[仕様](packages/io.github.d9speed.editor_core/README.md#transform-mirrorのui)と[検証記録](docs/transform_mirror_validation_report.md)を参照してください。
