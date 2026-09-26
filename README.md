@@ -1,5 +1,7 @@
 # D9speed Unity Editor Tools
 
+Editor Core 0.1.9で、`D9speed/Tools/説明画像つき板ポリプレハブ作成(EditorOnly)` を追加しました。文章をPNGにし、UnlitマテリアルとEditorOnlyの板ポリゴンプレハブをまとめて保存できます。作成にはBuilt-in Render PipelineとTMPフォントが必要です。[使い方](packages/io.github.d9speed.editor_core/README.md#説明画像つき板ポリプレハブ)を参照してください。
+
 Editor Core 0.1.8で、Inspectorのロック／解除にCtrl+Lのショートカットを追加しました。UnityのShortcutsの `Custom/ShortCutEX/InspectorLock` から割り当てを変更できます。
 
 Editor Core 0.1.7で、Hierarchyの右クリックに「選択オブジェクト名をコピー」を追加しました。複数選択した名前を `Body,Skirt,Glasses` のようにカンマ区切りでコピーできます。

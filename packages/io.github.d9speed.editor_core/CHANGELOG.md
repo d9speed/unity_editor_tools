@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9 - 2026-09-26
+
+- `D9speed/Tools/説明画像つき板ポリプレハブ作成(EditorOnly)` を追加。文章・TMPフォント・文字色・背景色・解像度を調整し、PNGとUnlitマテリアルを参照するEditorOnlyのQuadプレハブを保存。
+- PNG単体の保存、文字欠落の検出、はみ出し警告、プレビューの再利用、共通UIのフォント・ライト／ダーク設定に対応。
+- TMP連携をEditor専用の任意アセンブリへ分離。TMP未導入時もCoreの既存機能を維持。
+
 ## 0.1.8 - 2026-09-26
 
 - Inspectorのロック／解除を切り替えるショートカットを追加。初期設定はCtrl+L（macOSはCmd+L）。UnityのShortcutsの `Custom/ShortCutEX/InspectorLock` から変更可能。

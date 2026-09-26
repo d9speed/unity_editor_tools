@@ -1,0 +1,40 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements">
+    <ui:Style src="guide_board_window.uss" />
+    <ui:VisualElement name="guide_root" class="guide_root">
+        <ui:VisualElement class="header">
+            <ui:Label text="説明画像つき板ポリプレハブ" class="heading" />
+            <ui:Label text="文章を画像にして、EditorOnly の説明板として保存" class="subtitle" />
+        </ui:VisualElement>
+        <ui:VisualElement class="body">
+            <ui:ScrollView class="settings_panel">
+                <editor:ObjectField name="font_field" label="TMP フォント" />
+                <ui:TextField name="text_field" label="文章" multiline="true" class="text_field" />
+                <ui:VisualElement class="dimensions">
+                    <ui:IntegerField name="width_field" label="幅 px" />
+                    <ui:IntegerField name="height_field" label="高さ px" />
+                </ui:VisualElement>
+                <ui:SliderInt name="font_size_field" label="文字サイズ" low-value="8" high-value="256" show-input-field="true" />
+                <ui:SliderInt name="padding_field" label="余白 px" low-value="0" high-value="200" show-input-field="true" />
+                <ui:DropdownField name="alignment_field" label="配置" />
+                <editor:ColorField name="text_color_field" label="文字色" show-alpha="false" hdr="false" />
+                <editor:ColorField name="background_color_field" label="背景色" show-alpha="false" hdr="false" />
+                <ui:Label text="日本語を含む TMP フォントを選択してください。プレハブは高さ 1 m、画像の縦横比に合わせた幅で作成します。EditorOnly タグによりビルド時に除外されます。" class="hint" />
+            </ui:ScrollView>
+            <ui:VisualElement class="preview_panel">
+                <ui:VisualElement class="preview_header">
+                    <ui:Label text="プレビュー" />
+                    <ui:Label name="resolution_label" class="resolution_label" />
+                </ui:VisualElement>
+                <ui:VisualElement class="preview_frame">
+                    <ui:Image name="preview_image" class="preview_image" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:Label name="status_label" class="status_label" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="footer">
+            <ui:Button name="refresh_button" text="再描画" />
+            <ui:Button name="export_button" text="PNG を保存…" class="export_button" />
+            <ui:Button name="prefab_button" text="プレハブを保存…" class="d9_button_primary" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

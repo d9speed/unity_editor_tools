@@ -7,6 +7,8 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 - アセンブリ名: `D9speed.EditorUtils`。
 - 名前空間: `D9speed_BaseEditorUtils`。
 
+説明板プレハブ作成は任意のTextMeshPro連携アセンブリ `D9speed.EditorUtils.GuideBoard` を使用します。作成時はTextMeshPro 3.0.xとTMP Essential Resourcesが必要です。TMP未導入でもCoreの既存機能は利用できます。
+
 `FindSceneObjects<T>()`は有効なシーンオブジェクトを取得します。`true`を渡すと非アクティブも含めます。`GetObjectId()`はEditorセッション内の識別子を返します。
 
 ## Unity Utility
@@ -23,6 +25,7 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 | Component／Hierarchyの右クリック → `コピーしたコンポーネントを新規貼り付け` | シーンオブジェクトへ追加。Undo対応 |
 | Hierarchyの右クリック → メインカメラ関連の2項目 | 対象へカメラを向ける／対象の+Z方向から正対。Undo対応 |
 | `D9speed > Transform Mirror Tool` | X軸方向のミラー複製。左右名・Constraint／PhysBone／Colliderの対称化と作成ペアの事前表示 |
+| `D9speed > Tools > 説明画像つき板ポリプレハブ作成(EditorOnly)` | 文章を画像にし、EditorOnlyのQuadプレハブとPNG・Unlitマテリアルを保存 |
 | `Alt + R` | 選択したシーンオブジェクトのローカルTransformをリセット。Undo対応 |
 | `Ctrl + L`（macOSは`Cmd + L`） | Inspectorのロック／解除を切り替え |
 | Hierarchy | コンポーネントに変更があるPrefabインスタンスのルートへ変更マークを表示 |
@@ -51,6 +54,25 @@ VRChat SDKは必須依存にせず、導入されている場合に対応しま�
 共通スタイルは`Editor/ui`にあります。独自のEditorWindowへ適用する場合は、`CreateGUI()`から`EditorUiTheme.Apply(rootVisualElement)`を呼びます。開いたままのテーマ変更には`EditorUiTheme.RefreshTheme(rootVisualElement)`を`OnInspectorUpdate()`から呼びます。クラス`d9_ui_root`の配下だけに作用し、共通フォント設定を引き継ぎます。現在の適用先はTransform Mirrorです。
 
 アセット複製は既存のコピーを上書きせず、別名で作成します。参照置換はUnityのYAMLテキスト形式が対象です。選択範囲の外にある依存アセットは追加コピーせず、元の参照を維持します。バイナリ形式のアセット内の参照置換には対応しません。
+
+## 説明画像つき板ポリプレハブ
+
+Unity 2022.3 / Built-in Render Pipeline用のEditor専用ツールです。TextMeshPro 3.0.xをPackage Managerから導入し、初回は `Window > TextMeshPro > Import TMP Essential Resources` を実行してください。
+
+1. `D9speed/Tools/説明画像つき板ポリプレハブ作成(EditorOnly)` を開きます。
+2. TMPフォントを選び、文章・文字サイズ・余白・揃え方・文字色・背景色を調整します。
+3. プレビューを確認して「プレハブを保存…」を押し、Assets内の保存先を選びます。
+4. 作成したプレハブを必要な場所に配置します。
+
+同じフォルダーへ `.prefab`、`_image.png`、`_material.mat` を保存します。既存のアセットは上書きせず、同名の場合は連番を付けます。プレハブは `EditorOnly` タグ付き、ColliderなしのQuadで、高さ1 m・幅は画像の縦横比に合わせます。Unity標準のQuadと `Unlit/Texture` を使うため、正面はローカル-Z側です。シーンへ自動配置はしません。ビルドではEditorOnlyの説明板が除外されます。PNG単体の保存も可能です。
+
+日本語を含む場合は、対応する `.ttf` / `.otf` から作成したTMPフォントを選んでください。標準のLiberationSans SDFには日本語がありません。フォントの使用条件に従ってください。作成されたプレハブはPNGとマテリアルを参照し、TMP・フォント・専用スクリプトを参照しません。
+
+- 解像度は各辺64〜2048 px。自動折り返し・改行・左／中央／右揃えに対応します。リッチテキストは解釈しません。
+- 文字が枠に収まらない場合は警告し、保存時に確認します。フォントにない文字がある場合は保存を無効にします。
+- 変更から100 ms後に描画し、同じ解像度のRenderTextureを再利用します。ウィンドウを閉じるとプレビュー用シーン・描画リソースを解放します。
+- 共通UIのライト／ダーク・フォント設定を引き継ぎます。入力はスクリプトの再コンパイル時に保持しますが、文書やプリセットの永続保存はありません。
+- Assets内のPNGは無圧縮・sRGB・Mip Mapなし・Clampで保存します。透過PNGとURP/HDRPは対象外です。
 
 ## 設定
 

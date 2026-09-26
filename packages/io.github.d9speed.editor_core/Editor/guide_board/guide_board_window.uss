@@ -1,0 +1,108 @@
+.guide_root {
+    flex-grow: 1;
+}
+.header {
+    padding: 12px 16px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(128, 128, 128, 0.25);
+}
+.heading {
+    font-size: 16px;
+    -unity-font-style: bold;
+}
+.subtitle {
+    margin-top: 4px;
+    opacity: 0.7;
+}
+.body {
+    flex-direction: row;
+    flex-grow: 1;
+    min-height: 0;
+}
+.settings_panel {
+    width: 320px;
+    flex-shrink: 0;
+    padding: 10px;
+    border-right-width: 1px;
+    border-right-color: rgba(128, 128, 128, 0.25);
+}
+.settings_panel .unity-base-field {
+    margin-bottom: 8px;
+}
+.settings_panel .unity-base-field__label {
+    min-width: 86px;
+}
+.text_field {
+    flex-direction: column;
+}
+.text_field > .unity-base-field__label {
+    margin-bottom: 6px;
+}
+.text_field > .unity-base-field__input {
+    min-height: 180px;
+    white-space: normal;
+    -unity-text-align: upper-left;
+}
+.dimensions {
+    flex-direction: row;
+}
+.dimensions > .unity-base-field {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+.dimensions .unity-base-field__label {
+    min-width: 48px;
+}
+.hint {
+    white-space: normal;
+    margin-top: 10px;
+    opacity: 0.75;
+}
+.preview_panel {
+    flex-grow: 1;
+    min-width: 0;
+    padding: 12px;
+}
+.preview_header {
+    flex-direction: row;
+    margin-bottom: 10px;
+}
+.resolution_label {
+    flex-grow: 1;
+    -unity-text-align: middle-right;
+    opacity: 0.7;
+}
+.preview_frame {
+    flex-grow: 1;
+    min-height: 160px;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.08);
+}
+.preview_image {
+    width: 100%;
+    height: 100%;
+}
+.status_label {
+    white-space: normal;
+    min-height: 36px;
+    margin-top: 10px;
+}
+.d9_ui_root .status_label.warning {
+    color: var(--d9_color_error);
+}
+.footer {
+    flex-direction: row;
+    justify-content: flex-end;
+    padding: 10px 12px;
+    border-top-width: 1px;
+    border-top-color: rgba(128, 128, 128, 0.25);
+}
+.footer > Button {
+    min-height: 28px;
+    margin-left: 8px;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+.export_button {
+    -unity-font-style: bold;
+}

@@ -1,0 +1,12 @@
+{
+    "name": "D9speed.EditorUtils.GuideBoard",
+    "rootNamespace": "D9speed_BaseEditorUtils.GuideBoard",
+    "references": ["D9speed.EditorUtils", "Unity.TextMeshPro", "Unity.ugui"],
+    "includePlatforms": ["Editor"],
+    "autoReferenced": true,
+    "defineConstraints": ["D9SPEED_GUIDE_BOARD_TMP"],
+    "versionDefines": [
+        {"name": "com.unity.textmeshpro", "expression": "3.0.0", "define": "D9SPEED_GUIDE_BOARD_TMP"},
+        {"name": "com.unity.ugui", "expression": "2.0.0", "define": "D9SPEED_GUIDE_BOARD_TMP"}
+    ]
+}
