@@ -70,6 +70,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
         public string ParentName;
         public int Depth;
         public int Score;
+        public int evidence_priority;
         public string MatchedAlias;
         public string Reason;
     }
@@ -85,6 +86,10 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
         public Dictionary<string, BoneCandidate> ResolvedByKey = new Dictionary<string, BoneCandidate>();
         public Dictionary<Transform, Transform> SkinnedMeshTargetBySource = new Dictionary<Transform, Transform>();
         public Dictionary<string, Transform> NameMap = new Dictionary<string, Transform>();
+        public readonly HashSet<Transform> skin_bones = new HashSet<Transform>();
+        public readonly HashSet<Transform> bone_hierarchy = new HashSet<Transform>();
+        public readonly Dictionary<string, HashSet<Transform>> humanoid_bones = new Dictionary<string, HashSet<Transform>>();
+        public readonly HashSet<Transform> humanoid_transforms = new HashSet<Transform>();
     }
 
     private class MatchRow
@@ -857,6 +862,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
     {
         if (root == null || aliasMap == null) return null;
         var scan = new ScanResult { Root = root };
+        collect_bone_evidence(scan);
         var transforms = CollectTransformInfos(root.transform);
 
         foreach (var pair in aliasMap)
@@ -864,15 +870,16 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             var candidates = new List<BoneCandidate>();
             foreach (var info in transforms)
             {
-                var candidate = ScoreTransform(pair.Key, pair.Value, info);
-                if (candidate.Score >= CandidateScoreThreshold)
+                var candidate = score_bone_candidate(scan, pair.Key, pair.Value, info);
+                if (candidate != null && candidate.Score >= CandidateScoreThreshold)
                 {
                     candidates.Add(candidate);
                 }
             }
 
             candidates = candidates
-                .OrderByDescending(c => c.Score)
+                .OrderByDescending(c => c.evidence_priority)
+                .ThenByDescending(c => c.Score)
                 .ThenBy(c => c.Depth)
                 .ThenBy(c => c.RelativePath, StringComparer.Ordinal)
                 .ToList();
@@ -880,7 +887,8 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             var best = candidates.FirstOrDefault(c => c.Score >= MinimumScore);
             if (best != null)
             {
-                var tied = candidates.Where(candidate => candidate.Score == best.Score).ToList();
+                var tied = candidates.Where(candidate => candidate.evidence_priority == best.evidence_priority
+                    && candidate.Score == best.Score).ToList();
                 if (tied.Count == 1) scan.ResolvedByKey[pair.Key] = best;
                 else
                 {
@@ -1339,7 +1347,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
                 return pair.Value;
             }
             var targetChild = pair.Value.Find(subPath);
-            if (targetChild != null)
+            if (targetChild != null && have_matching_bone_roles(sourceTransform, targetChild, source, target))
             {
                 method = "SkinnedMeshペア配下";
                 return targetChild;
@@ -1366,15 +1374,26 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
                 return targetBone.Transform;
             }
             var targetChild = targetBone.Transform.Find(subPath);
-            if (targetChild != null)
+            if (targetChild != null && have_matching_bone_roles(sourceTransform, targetChild, source, target))
             {
                 method = $"ボーン配下: {pair.Key}";
                 return targetChild;
             }
         }
 
-        // フォールバック: コピー先に同名のTransformがあればそれを使う
-        if (target.NameMap.TryGetValue(sourceTransform.name, out var sameName) && sameName != null)
+        // 補助オブジェクトは元の階層を保つ。同名の実ボーンには割り当てない。
+        var relative_path = HumanoidMappingHelper.GetRelativePath(source.Root.transform, sourceTransform);
+        var same_path = find_unique_relative_path(target.Root.transform, relative_path);
+        if (same_path != null && have_matching_bone_roles(sourceTransform, same_path, source, target))
+        {
+            method = "階層パス一致";
+            return same_path;
+        }
+        if (source.bone_hierarchy.Count > 0 && !is_bone_transform(sourceTransform, source)) return null;
+
+        // リグ情報のない階層などでは、従来の一意な名前一致も使用する。
+        if (target.NameMap.TryGetValue(sourceTransform.name, out var sameName) && sameName != null
+            && have_matching_bone_roles(sourceTransform, sameName, source, target))
         {
             method = "名前一致";
             return sameName;

@@ -2,6 +2,8 @@
 
 ヒューマノイドのボーン名の違いを辞書で対応付け、シーン上のオブジェクト間でコンポーネントをコピーします。
 
+0.1.1以降は有効なHumanoid設定を優先し、それ以外はSkinnedMeshRendererが参照するボーンとその親階層を辞書で照合します。例えば衣装の`UpperLeg.L`と`Cloth_Collider/UpperLeg_L`を区別し、コライダー側は補助階層としてコピーします。リグ情報がない場合は従来の名前照合を使用し、複数の実ボーン候補が残る場合は手動指定が必要です。
+
 ## 導入と使用
 
 [案内ページ](https://d9speed.github.io/Unity_Tools/)からVCC / ALCOMに登録し、`D9speed Humanoid Alias Copy`を導入してください。Editor Core 0.1.1以降が必要です。
