@@ -6,12 +6,14 @@
 
 ## 導入と使用
 
-[案内ページ](https://d9speed.github.io/Unity_Tools/)からVCC / ALCOMに登録し、`D9speed Humanoid Alias Copy`を導入してください。Editor Core 0.1.1以降が必要です。
+[案内ページ](https://d9speed.github.io/Unity_Tools/)からVCC / ALCOMに登録し、`D9speed Humanoid Alias Copy`を導入してください。Editor Core 0.1.5以降が必要です。
 
 1. Unityの`D9speed > Tools > Humanoid Alias Component Copier`を開きます。
 2. コピー元とコピー先のシーンオブジェクトを指定します。
-3. 対応先とコピー対象のプレビューを確認します。曖昧な対応は手動指定できます。
-4. コピーを実行します。変更はUndoで戻せます。
+3. `VRC PhysBone`（Colliderを含む）、`Unity / VRC Constraint`、`MA`の3タブから種類を選び、コピー元・コピー先と行のチェックを確認します。曖昧な対応は「コピー設定・手動対応」から指定できます。
+4. 表示中タブの選択項目をコピーします。他タブのチェック状態は保持されますが、コピーには含まれません。変更はUndoで戻せます。
+
+Unity Collider、VRC Contact、Particle、SkinnedMeshのマテリアルは「その他・共通」に表示し、その欄の専用ボタンでコピーします。別タブのコンポーネントを参照する場合は、コピー先に対応コンポーネントがあるか「ボーン対応・参照の詳細」で確認してください。Fluent 2に合わせたEditor Core共通テーマ、ライト／ダーク表示、列幅の調整に対応しています。
 
 既存コンポーネントの更新・追加、常に追加、既存をスキップの各モードに対応します。コピー対象からの除外と、コピー先に合わせた参照の置き換えも行います。PrefabアセットやPrefab編集モード内を直接コピー先にはできません。
 

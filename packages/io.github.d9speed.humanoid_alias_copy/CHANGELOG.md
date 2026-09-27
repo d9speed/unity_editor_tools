@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 - 2026-09-27
+
+- コピー一覧をVRC PhysBone（Collider含む）、Unity / VRC Constraint、MAの3タブへ分類。
+- コピー実行を表示中タブのチェック済み項目だけに限定し、タブを切り替えても除外状態を保持。
+- Unity Collider・Contact・Particle・マテリアルは「その他・共通」の専用欄とコピー操作へ分離。
+- Fluent 2のEditor Core共通テーマを適用し、ライト／ダーク表示、列幅変更、固定フッター、詳細の折りたたみに対応。
+- Editor Coreの必要バージョンを0.1.5以上へ更新。
+
 ## 0.1.1 - 2026-09-27
 
 - Humanoid設定を優先し、SkinnedMeshRendererのボーン参照と親階層を使って実ボーンを判定。

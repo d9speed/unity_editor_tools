@@ -22,18 +22,18 @@ public partial class HumanoidAliasComponentCopierWindow
 
     private VisualElement BuildCopyOptions()
     {
-        var panel = new VisualElement();
+        var panel = EditorUiControls.Foldout("コピー設定・手動対応");
         var modes = new List<string> { "既存を更新・不足分を追加", "常に追加", "既存はスキップ・不足分を追加" };
-        var mode = new DropdownField("コンポーネントのコピー方法", modes, (int)copy_mode);
+        var mode = EditorUiControls.Field(new DropdownField("コンポーネントのコピー方法", modes, (int)copy_mode));
         mode.RegisterValueChangedCallback(evt => { copy_mode = (ComponentCopyMode)modes.IndexOf(evt.newValue); RefreshPreview(); });
         panel.Add(mode);
         mode.tooltip = "同じ型のコンポーネントは、チェックされたコピー元の並び順でコピー先に対応付けます。";
-        var manual = new Foldout { text = "対応先を手動指定（ボーン・メッシュ・その他の階層）", value = false };
-        var from = new ObjectField("コピー元Transform") { objectType = typeof(Transform), allowSceneObjects = true };
-        var to = new ObjectField("対応先Transform") { objectType = typeof(Transform), allowSceneObjects = true };
+        var manual = EditorUiControls.Foldout("対応先を手動指定（ボーン・メッシュ・その他の階層）");
+        var from = EditorUiControls.Field(new ObjectField("コピー元Transform") { objectType = typeof(Transform), allowSceneObjects = true });
+        var to = EditorUiControls.Field(new ObjectField("対応先Transform") { objectType = typeof(Transform), allowSceneObjects = true });
         manual.Add(from);
         manual.Add(to);
-        manual.Add(new Button(() =>
+        manual.Add(EditorUiControls.Button("この対応を使用", () =>
         {
             var source = from.value as Transform;
             var target = to.value as Transform;
@@ -58,7 +58,7 @@ public partial class HumanoidAliasComponentCopierWindow
             }
             manual_targets[source] = target;
             Scan();
-        }) { text = "この対応を使用" });
+        }));
         manual_list = new VisualElement();
         manual.Add(manual_list);
         panel.Add(manual);
@@ -77,9 +77,9 @@ public partial class HumanoidAliasComponentCopierWindow
         foreach (var pair in manual_targets.ToArray())
         {
             if (pair.Key == null || pair.Value == null) { manual_targets.Remove(pair.Key); continue; }
-            var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-            row.Add(new Label($"{HierarchyPathHelper.GetHierarchyPath(pair.Key)} → {HierarchyPathHelper.GetHierarchyPath(pair.Value)}") { style = { flexGrow = 1 } });
-            row.Add(new Button(() => { manual_targets.Remove(pair.Key); Scan(); }) { text = "解除" });
+            var row = EditorUiControls.Row();
+            row.Add(EditorUiControls.Label($"{HierarchyPathHelper.GetHierarchyPath(pair.Key)} → {HierarchyPathHelper.GetHierarchyPath(pair.Value)}"));
+            row.Add(EditorUiControls.Button("解除", () => { manual_targets.Remove(pair.Key); Scan(); }));
             manual_list?.Add(row);
         }
     }
@@ -158,6 +158,7 @@ public partial class HumanoidAliasComponentCopierWindow
         }
         if (issues.Count == 0) return;
         var foldout = new Foldout { text = $"コピー元への参照が残る可能性: {component.name} / {component.GetType().Name} ({issues.Count})", value = true };
+        foldout.AddToClassList("d9_foldout");
         foreach (var issue in issues) foldout.Add(new Label(issue));
         componentReportView?.Add(foldout);
     }

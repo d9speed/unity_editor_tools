@@ -25,13 +25,6 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
     private const int AuxiliaryBonePenalty = 35;  // twist/end/roll/helper への減点
     private const int MaxCandidatesPerKey = 5;
 
-    // ---- 行レイアウト(リストの列幅) ----
-    private const float ColumnKeyWidth = 140;
-    private const float ColumnScoreWidth = 44;
-    private const float ColumnNameWidth = 150;
-    private const float ColumnOperationWidth = 170;
-    private const float ColumnMethodWidth = 130;
-
     private ObjectField sourceField;
     private ObjectField targetField;
     private Toggle copySkinnedMeshMaterialsToggle;
@@ -40,7 +33,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
     private ListView targetListView;
     private ListView unresolvedListView;
     private ScrollView componentReportView;
-    private ListView copyListView;
+    private MultiColumnListView copyListView;
 
     private readonly List<string> warnings = new List<string>();
     private readonly List<MatchRow> sourceRows = new List<MatchRow>();
@@ -154,7 +147,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
     {
         var window = GetWindow<HumanoidAliasComponentCopierWindow>();
         window.titleContent = new GUIContent("Humanoidエイリアスコピー");
-        window.minSize = new Vector2(820, 480);
+        window.minSize = new Vector2(860, 620);
         window.Show();
     }
 
@@ -166,267 +159,6 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
 
     // ================================================================
     // UI構築
-    // ================================================================
-
-    private void CreateUI()
-    {
-        rootVisualElement.Clear();
-        D9speedEditorFontUtility.Apply(rootVisualElement);
-        rootVisualElement.style.paddingLeft = 6;
-        rootVisualElement.style.paddingRight = 6;
-        rootVisualElement.style.paddingTop = 4;
-
-        rootVisualElement.Add(BuildHeaderArea());
-
-        warningBox = new HelpBox("", HelpBoxMessageType.Warning);
-        warningBox.style.display = DisplayStyle.None;
-        rootVisualElement.Add(warningBox);
-
-        var split = new TwoPaneSplitView(1, 240, TwoPaneSplitViewOrientation.Vertical);
-        split.style.flexGrow = 1;
-        split.style.marginTop = 4;
-        split.Add(BuildCopyListPane());
-        split.Add(BuildResolutionPane());
-        rootVisualElement.Add(split);
-    }
-
-    // 上部: 入力フィールドと操作ボタン
-    private VisualElement BuildHeaderArea()
-    {
-        var header = new VisualElement();
-
-        var title = new Label("Humanoidエイリアス コンポーネントコピー");
-        title.style.unityFontStyleAndWeight = FontStyle.Bold;
-        title.style.fontSize = 13;
-        title.style.marginBottom = 4;
-        header.Add(title);
-
-        sourceField = new ObjectField("コピー元 (シーン上)") { objectType = typeof(GameObject) };
-        sourceField.tooltip = "コンポーネントのコピー元となるシーン上のPrefabインスタンス";
-        targetField = new ObjectField("コピー先 (シーン上)") { objectType = typeof(GameObject) };
-        targetField.tooltip = "コンポーネントを貼り付ける先のシーン上のPrefabインスタンス";
-        header.Add(sourceField);
-        header.Add(targetField);
-        sourceField.RegisterValueChangedCallback(_ => Scan());
-        targetField.RegisterValueChangedCallback(_ => Scan());
-        header.Add(BuildCopyOptions());
-
-        copySkinnedMeshMaterialsToggle = new Toggle("対応するSkinnedMeshのマテリアルもコピー") { value = copySkinnedMeshMaterials };
-        copySkinnedMeshMaterialsToggle.RegisterValueChangedCallback(evt =>
-        {
-            copySkinnedMeshMaterials = evt.newValue;
-            Scan();
-        });
-        header.Add(copySkinnedMeshMaterialsToggle);
-
-        var buttonRow = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 4, marginBottom = 4 } };
-        buttonRow.Add(new Button(LoadAliases) { text = "エイリアス再読込" });
-        buttonRow.Add(new Button(Scan) { text = "スキャン" });
-        var copyButton = execute_button = new Button(ExecuteCopy) { text = "コピー実行" };
-        copyButton.style.unityFontStyleAndWeight = FontStyle.Bold;
-        buttonRow.Add(copyButton);
-        header.Add(buttonRow);
-
-        return header;
-    }
-
-    // 上段: コピー元 → コピー先 の対応一覧
-    private VisualElement BuildCopyListPane()
-    {
-        var pane = new VisualElement { style = { minHeight = 120 } };
-
-        pane.Add(CreateSectionLabel("コピー一覧 (コピー元 → コピー先)"));
-        pane.Add(copy_summary = new Label());
-        pane.Add(CreateCopyHeaderRow());
-
-        copyListView = new ListView(copyRows, 22, MakeCopyRow, (e, i) => BindCopyRow(e, copyRows[i]));
-        copyListView.selectionType = SelectionType.None;
-        copyListView.showAlternatingRowBackgrounds = AlternatingRowBackground.ContentOnly;
-        copyListView.style.flexGrow = 1;
-        pane.Add(copyListView);
-
-        return pane;
-    }
-
-    // 下段: どのパス・方法で解決したかの詳細
-    private VisualElement BuildResolutionPane()
-    {
-        var pane = new VisualElement { style = { minHeight = 140 } };
-
-        pane.Add(CreateSectionLabel("解決の詳細"));
-
-        var split = new TwoPaneSplitView(0, 420, TwoPaneSplitViewOrientation.Horizontal);
-        split.style.flexGrow = 1;
-
-        var left = new VisualElement { style = { minWidth = 240, paddingRight = 4 } };
-        left.Add(CreateSubLabel("コピー元の候補ボーン"));
-        left.Add(CreateMatchHeaderRow());
-        sourceListView = BuildMatchListView(sourceRows);
-        sourceListView.style.flexGrow = 3;
-        sourceListView.style.minHeight = 60;
-        left.Add(sourceListView);
-        left.Add(CreateSubLabel("自動対応できない標準キー（手動指定可）"));
-        unresolvedListView = new ListView(unresolvedRows, 20, () => new Label(), (e, i) => ((Label)e).text = unresolvedRows[i]);
-        unresolvedListView.showAlternatingRowBackgrounds = AlternatingRowBackground.ContentOnly;
-        unresolvedListView.style.flexGrow = 2;
-        unresolvedListView.style.minHeight = 50;
-        left.Add(unresolvedListView);
-
-        var right = new VisualElement { style = { minWidth = 240, paddingLeft = 4 } };
-        right.Add(CreateSubLabel("コピー先の候補ボーン"));
-        right.Add(CreateMatchHeaderRow());
-        targetListView = BuildMatchListView(targetRows);
-        targetListView.style.flexGrow = 3;
-        targetListView.style.minHeight = 60;
-        right.Add(targetListView);
-        right.Add(CreateSubLabel("検出コンポーネント / SkinnedMeshペア"));
-        componentReportView = new ScrollView();
-        componentReportView.style.flexGrow = 2;
-        componentReportView.style.minHeight = 50;
-        right.Add(componentReportView);
-
-        split.Add(left);
-        split.Add(right);
-        pane.Add(split);
-
-        return pane;
-    }
-
-    // コピー一覧の列見出し
-    private static VisualElement CreateCopyHeaderRow()
-    {
-        var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-        row.Add(CreateHeaderCell("", 24));
-        row.Add(CreateHeaderCell("操作", ColumnOperationWidth));
-        var source = CreateHeaderCell("コピー元", 0);
-        source.style.flexGrow = 1;
-        source.style.flexBasis = 0;
-        row.Add(source);
-        row.Add(CreateHeaderCell("", 20));
-        var target = CreateHeaderCell("コピー先", 0);
-        target.style.flexGrow = 1;
-        target.style.flexBasis = 0;
-        row.Add(target);
-        row.Add(CreateHeaderCell("解決方法", ColumnMethodWidth));
-        return row;
-    }
-
-    private VisualElement MakeCopyRow()
-    {
-        var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-        var enabled = new Toggle { name = "Enabled", style = { width = 24 } };
-        enabled.RegisterValueChangedCallback(evt =>
-        {
-            if (!(enabled.userData is CopyRow item) || item.SourceComponent == null) return;
-            var excluded = item.IsMaterial ? excluded_materials : excluded_components;
-            if (evt.newValue) excluded.Remove(item.SourceComponent); else excluded.Add(item.SourceComponent);
-            RefreshPreview();
-        });
-        row.Add(enabled);
-        row.Add(new Label { name = "Operation", style = { width = ColumnOperationWidth, overflow = Overflow.Hidden } });
-        row.Add(new Label { name = "Source", style = { flexGrow = 1, flexBasis = 0, overflow = Overflow.Hidden } });
-        row.Add(new Label("→") { style = { width = 20, unityTextAlign = TextAnchor.MiddleCenter } });
-        row.Add(new Label { name = "Target", style = { flexGrow = 1, flexBasis = 0, overflow = Overflow.Hidden } });
-        var method = new Label { name = "Method", style = { width = ColumnMethodWidth, overflow = Overflow.Hidden } };
-        method.style.color = new Color(0.65f, 0.65f, 0.65f);
-        row.Add(method);
-        return row;
-    }
-
-    private void BindCopyRow(VisualElement row, CopyRow item)
-    {
-        var enabled = row.Q<Toggle>("Enabled");
-        enabled.userData = item;
-        enabled.SetEnabled(item.SourceComponent != null);
-        enabled.SetValueWithoutNotify(item.SourceComponent == null || !(item.IsMaterial ? excluded_materials : excluded_components).Contains(item.SourceComponent));
-        row.Q<Label>("Operation").text = item.Operation;
-        row.Q<Label>("Source").text = item.SourceName;
-        row.Q<Label>("Target").text = item.TargetName;
-        row.Q<Label>("Method").text = item.Method;
-        row.tooltip = item.Tooltip;
-    }
-
-    private static Label CreateSectionLabel(string text)
-    {
-        var label = new Label(text);
-        label.style.unityFontStyleAndWeight = FontStyle.Bold;
-        label.style.fontSize = 12;
-        label.style.paddingTop = 2;
-        label.style.paddingBottom = 2;
-        label.style.paddingLeft = 4;
-        label.style.marginBottom = 2;
-        label.style.backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.18f);
-        return label;
-    }
-
-    // Foldout内の行など、ListView以外の場所に奇数/偶数の縞背景を付ける
-    private static void ApplyZebraBackground(VisualElement row, int index)
-    {
-        if (index % 2 == 1)
-        {
-            row.style.backgroundColor = new Color(0.5f, 0.5f, 0.5f, 0.08f);
-        }
-    }
-
-    private static Label CreateSubLabel(string text)
-    {
-        var label = new Label(text);
-        label.style.unityFontStyleAndWeight = FontStyle.Bold;
-        label.style.marginTop = 4;
-        return label;
-    }
-
-    // 候補リストの列見出し
-    private static VisualElement CreateMatchHeaderRow()
-    {
-        var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-        row.Add(CreateHeaderCell("キー", ColumnKeyWidth));
-        row.Add(CreateHeaderCell("一致度", ColumnScoreWidth));
-        row.Add(CreateHeaderCell("名前", ColumnNameWidth));
-        var detail = CreateHeaderCell("詳細", 0);
-        detail.style.flexGrow = 1;
-        row.Add(detail);
-        return row;
-    }
-
-    private static Label CreateHeaderCell(string text, float width)
-    {
-        var label = new Label(text);
-        if (width > 0) label.style.width = width;
-        label.style.unityFontStyleAndWeight = FontStyle.Bold;
-        label.style.color = new Color(0.7f, 0.7f, 0.7f);
-        return label;
-    }
-
-    private static ListView BuildMatchListView(List<MatchRow> rows)
-    {
-        var listView = new ListView(rows, 22, MakeMatchRow, (e, i) => BindMatchRow(e, rows[i]));
-        listView.selectionType = SelectionType.None;
-        listView.showAlternatingRowBackgrounds = AlternatingRowBackground.ContentOnly;
-        return listView;
-    }
-
-    private static VisualElement MakeMatchRow()
-    {
-        var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-        row.Add(new Label { name = "Key", style = { width = ColumnKeyWidth, overflow = Overflow.Hidden } });
-        row.Add(new Label { name = "Score", style = { width = ColumnScoreWidth } });
-        row.Add(new Label { name = "Name", style = { width = ColumnNameWidth, overflow = Overflow.Hidden } });
-        row.Add(new Label { name = "Detail", style = { flexGrow = 1, overflow = Overflow.Hidden } });
-        return row;
-    }
-
-    private static void BindMatchRow(VisualElement row, MatchRow item)
-    {
-        row.Q<Label>("Key").text = item.Key;
-        row.Q<Label>("Score").text = item.Score;
-        row.Q<Label>("Name").text = item.Name;
-        row.Q<Label>("Detail").text = item.Detail;
-        row.tooltip = item.Tooltip;
-    }
-
-    // ================================================================
-    // 操作
     // ================================================================
 
     private void LoadAliases()
@@ -527,11 +259,15 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
     {
         preview_stamp = null;
         copyRows.Clear();
+        common_copy_rows.Clear();
         if (copy_summary != null) copy_summary.text = "コピー元とコピー先を指定してください。";
+        if (common_summary != null) common_summary.text = "コピー元とコピー先を指定してください。";
         if (componentReportView != null) componentReportView.Clear();
+        refresh_copy_tabs();
         if (sourceScan == null || targetScan == null) return;
 
-        var plan = BuildCopyPlan(sourceScan, targetScan);
+        var plan = BuildCopyPlan(sourceScan, targetScan, active_copy_tab);
+        var common_plan = BuildCopyPlan(sourceScan, targetScan, copy_group.other);
         foreach (var ambiguous in sourceScan.AmbiguousTransforms.Where(transform => transform != null
             && IsAmbiguousPath(transform, sourceScan, targetScan)))
         {
@@ -539,11 +275,20 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             if (!warnings.Contains(message)) warnings.Add(message);
         }
         RebuildComponentReport(plan.Components);
+        append_preview_rows(plan, copyRows);
+        append_preview_rows(common_plan, common_copy_rows);
+        AddSkinnedMeshMaterialPreview(common_copy_rows);
+        preview_stamp = CapturePreviewStamp();
+        copy_summary.text = $"このタブ: 選択 {count_selected(copyRows)} / {plan.Components.Count}件　作成予定の階層: {plan.AddedObjects.Count}件";
+        common_summary.text = $"その他・共通: 選択 {count_selected(common_copy_rows)}件　作成予定の階層: {common_plan.AddedObjects.Count}件";
+    }
 
+    private void append_preview_rows(CopyPlan plan, List<CopyRow> rows)
+    {
         foreach (var added in plan.AddedObjects.OrderBy(go => HumanoidMappingHelper.GetDepth(go.transform)))
         {
             var parentName = added.transform.parent != null ? added.transform.parent.name : "";
-            copyRows.Add(new CopyRow
+            rows.Add(new CopyRow
             {
                 Operation = "選択対象の階層を作成",
                 SourceName = added.name,
@@ -552,8 +297,6 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
                 Tooltip = $"コピー元パス: {HumanoidMappingHelper.GetRelativePath(sourceScan.Root.transform, added.transform)}"
             });
         }
-
-        AddSkinnedMeshMaterialPreview();
 
         foreach (var component in plan.Components)
         {
@@ -584,7 +327,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
                 : existing == null ? "追加" : copy_mode == ComponentCopyMode.UpdateOrAdd ? "更新"
                 : copy_mode == ComponentCopyMode.SkipExisting ? "スキップ" : "追加";
             if (component is ParticleSystemRenderer && existing != null && copy_mode != ComponentCopyMode.SkipExisting) operation = "更新（自動付属Renderer）";
-            copyRows.Add(new CopyRow
+            rows.Add(new CopyRow
             {
                 SourceComponent = component,
                 Operation = operation + ": " + component.GetType().Name,
@@ -595,8 +338,6 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             });
             if (!excluded_components.Contains(component) && operation != "スキップ") AddReferencePreview(component, plan);
         }
-        preview_stamp = CapturePreviewStamp();
-        if (copy_summary != null) copy_summary.text = $"選択コンポーネント: {plan.Components.Count(item => !excluded_components.Contains(item))} / {plan.Components.Count}件　新規階層: {plan.AddedObjects.Count}件";
     }
 
     private void RebuildComponentReport(List<Component> components)
@@ -619,11 +360,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
 
         foreach (var group in grouped)
         {
-            var foldout = new Foldout
-            {
-                text = $"{group.Key.Label} ({group.Count()}件)",
-                value = false
-            };
+            var foldout = EditorUiControls.Foldout($"{group.Key.Label} ({group.Count()}件)");
 
             var rowIndex = 0;
             foreach (var component in group.OrderBy(c => HumanoidMappingHelper.GetRelativePath(sourceScan.Root.transform, c.transform), StringComparer.Ordinal))
@@ -639,7 +376,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
         }
     }
 
-    private void AddSkinnedMeshMaterialPreview()
+    private void AddSkinnedMeshMaterialPreview(List<CopyRow> rows)
     {
         if (!copySkinnedMeshMaterials || sourceScan == null || targetScan == null) return;
 
@@ -650,7 +387,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             if (sourceRenderer == null || targetRenderer == null) continue;
             if (!HasMaterialArrayDifference(sourceRenderer, targetRenderer)) continue;
 
-            copyRows.Add(new CopyRow
+            rows.Add(new CopyRow
             {
                 SourceComponent = sourceRenderer,
                 IsMaterial = true,
@@ -670,11 +407,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             .ToList();
         if (pairs.Count == 0) return;
 
-        var foldout = new Foldout
-        {
-            text = $"SkinnedMesh ペア ({pairs.Count}件)",
-            value = false
-        };
+        var foldout = EditorUiControls.Foldout($"SkinnedMesh ペア ({pairs.Count}件)");
 
         var rowIndex = 0;
         foreach (var pair in pairs)
@@ -692,6 +425,11 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
 
     private void ExecuteCopy()
     {
+        execute_group_copy(active_copy_tab);
+    }
+
+    private void execute_group_copy(copy_group group_to_copy)
+    {
         if (EditorApplication.isPlaying || sourceScan == null || targetScan == null
             || !ValidateRoots(sourceScan.Root, targetScan.Root))
         {
@@ -706,8 +444,10 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             UpdateUI();
             return;
         }
-        var plan = BuildCopyPlan(sourceScan, targetScan);
+        var plan = BuildCopyPlan(sourceScan, targetScan, group_to_copy);
         var selected = plan.Components.Where(component => component != null && !excluded_components.Contains(component)).ToList();
+        var copy_materials = group_to_copy == copy_group.other && copySkinnedMeshMaterials;
+        if (selected.Count == 0 && !(copy_materials && common_copy_rows.Any(row => row.IsMaterial && !excluded_materials.Contains(row.SourceComponent)))) return;
         if (selected.Any(component => IsAmbiguousPath(component.transform, sourceScan, targetScan)))
         {
             warnings.Add("曖昧な対応が残っています。手動指定するか、そのコンポーネントをチェックから外してください。");
@@ -725,7 +465,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             Undo.RegisterFullObjectHierarchyUndo(targetScan.Root, "Humanoid Alias Copy");
             foreach (var added in plan.AddedObjects.OrderBy(go => HumanoidMappingHelper.GetDepth(go.transform)))
                 if (!addedMap.ContainsKey(added)) CreateMappedObject(added, sourceScan, targetScan, plan.AddedObjects, addedMap, warnings);
-            if (copySkinnedMeshMaterials) CopyPairedSkinnedMeshMaterials(sourceScan);
+            if (copy_materials) CopyPairedSkinnedMeshMaterials(sourceScan);
             var used_targets = new HashSet<Component>();
             foreach (var component in selected)
             {
@@ -757,7 +497,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             Undo.FlushUndoRecordObjects();
             Undo.CollapseUndoOperations(group);
             EditorSceneManager.MarkSceneDirty(targetScan.Root.scene);
-            warnings.Add($"コピー完了: コンポーネント {copiedPairs.Count}件。Undoで一括して戻せます。");
+            warnings.Add($"コピー完了: {copy_group_label(group_to_copy)} / コンポーネント {copiedPairs.Count}件。Undoで一括して戻せます。");
         }
         catch (Exception exception)
         {
@@ -1020,7 +760,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
     // コピー計画
     // ================================================================
 
-    private CopyPlan BuildCopyPlan(ScanResult source, ScanResult target)
+    private CopyPlan BuildCopyPlan(ScanResult source, ScanResult target, copy_group group_to_copy)
     {
         var plan = new CopyPlan();
         if (source == null || target == null) return plan;
@@ -1029,7 +769,7 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
 
         foreach (var component in source.Root.GetComponentsInChildren<Component>(true))
         {
-            if (!IsSupportedComponent(component)) continue;
+            if (!IsSupportedComponent(component) || get_copy_group(component) != group_to_copy) continue;
             plan.Components.Add(component);
             if (!excluded_components.Contains(component) && !IsAmbiguousPath(component.transform, source, target))
                 AddMissingHierarchy(component.transform, source, target, plan.AddedObjects);
@@ -1477,16 +1217,22 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
 
     private void UpdateUI()
     {
-        execute_button?.SetEnabled(sourceScan != null && targetScan != null && preview_stamp != null && !EditorApplication.isPlaying);
+        var ready = sourceScan != null && targetScan != null && preview_stamp != null && !EditorApplication.isPlaying;
+        execute_button?.SetEnabled(ready && count_selected(copyRows) > 0);
+        common_copy_button?.SetEnabled(ready && count_selected(common_copy_rows) > 0);
         sourceListView?.Rebuild();
         targetListView?.Rebuild();
         unresolvedListView?.Rebuild();
         copyListView?.Rebuild();
+        common_copy_list?.Rebuild();
+        copy_empty_label?.EnableInClassList("d9_hidden", copyRows.Count > 0);
+        common_empty_label?.EnableInClassList("d9_hidden", common_copy_rows.Count > 0);
 
         if (warningBox != null)
         {
             var text = string.Join("\n", warnings.Distinct());
-            warningBox.style.display = string.IsNullOrWhiteSpace(text) ? DisplayStyle.None : DisplayStyle.Flex;
+            warning_scroll?.EnableInClassList("d9_hidden", string.IsNullOrWhiteSpace(text));
+            warningBox.messageType = warnings.All(w => w.StartsWith("コピー完了:")) ? HelpBoxMessageType.Info : HelpBoxMessageType.Warning;
             warningBox.text = text;
         }
     }

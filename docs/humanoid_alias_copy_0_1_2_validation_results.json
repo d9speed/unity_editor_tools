@@ -1,0 +1,169 @@
+{
+  "sdk_absent": {
+    "regression": {
+      "unity": "2022.3.22f1",
+      "passed": true,
+      "checks": [
+        {
+          "name": "Lime-style six collider name collisions resolve to skin bones",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Repeated copy updates existing helper hierarchy without duplicates",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Each category copy can be undone as one operation",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Name-only rigs retain legacy alias matching and reference remapping",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Two real skinned rigs remain ambiguous and block copying",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Manual mapping can resolve a real bone ambiguity",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Duplicate auxiliary leaf names use their full hierarchy paths",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "References outside the selected source are preserved",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Humanoid configuration maps bones with arbitrary names and spaced finger keys",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Changing skin bone references invalidates the preview",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Actual Lime/Rurune hierarchy metadata resolves without false ambiguity",
+          "passed": true,
+          "detail": "ok"
+        }
+      ]
+    },
+    "ui": {
+      "passed": true,
+      "unity": "2022.3.22f1",
+      "checks": [
+        "Exactly three tabs, separate common copy, classification and resizable columns",
+        "Constraint copy changes checked rows only; other tabs, materials and common colliders stay unchanged; Undo",
+        "Missing hierarchy is created only for checked components in the active tab",
+        "Common copy changes only selected common components and materials",
+        "physbone_dark layout, theme and footer",
+        "physbone_light layout, theme and footer",
+        "narrow layout, theme and footer",
+        "constraint_dark layout, theme and footer",
+        "Real checkbox events persist across tabs; all unchecked disables copy and execution is a no-op",
+        "ma_dark layout, theme and footer"
+      ],
+      "errors": []
+    }
+  },
+  "sdk_and_ma": {
+    "regression": {
+      "unity": "2022.3.22f1",
+      "passed": true,
+      "checks": [
+        {
+          "name": "Lime-style six collider name collisions resolve to skin bones",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Repeated copy updates existing helper hierarchy without duplicates",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Each category copy can be undone as one operation",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Name-only rigs retain legacy alias matching and reference remapping",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Two real skinned rigs remain ambiguous and block copying",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Manual mapping can resolve a real bone ambiguity",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Duplicate auxiliary leaf names use their full hierarchy paths",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "References outside the selected source are preserved",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Humanoid configuration maps bones with arbitrary names and spaced finger keys",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Changing skin bone references invalidates the preview",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "VRC ParentConstraint and PhysBone collider references follow copied helpers",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Actual Lime/Rurune hierarchy metadata resolves without false ambiguity",
+          "passed": true,
+          "detail": "ok"
+        }
+      ]
+    },
+    "ui": {
+      "passed": true,
+      "unity": "2022.3.22f1",
+      "checks": [
+        "Exactly three tabs, separate common copy, classification and resizable columns",
+        "Constraint copy changes checked rows only; other tabs, materials and common colliders stay unchanged; Undo",
+        "Missing hierarchy is created only for checked components in the active tab",
+        "Common copy changes only selected common components and materials",
+        "PhysBone tab copies colliders and remaps references without copying other categories",
+        "MA tab copies MA only",
+        "physbone_dark layout, theme and footer",
+        "physbone_light layout, theme and footer",
+        "narrow layout, theme and footer",
+        "constraint_dark layout, theme and footer",
+        "Real checkbox events persist across tabs; all unchecked disables copy and execution is a no-op",
+        "ma_dark layout, theme and footer"
+      ],
+      "errors": []
+    }
+  }
+}

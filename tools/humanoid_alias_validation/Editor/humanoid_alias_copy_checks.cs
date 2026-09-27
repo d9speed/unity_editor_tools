@@ -20,6 +20,8 @@ namespace D9speed.HumanoidAliasValidation
         private static readonly validation_report report = new validation_report();
         private static object get(object obj, string field) => obj.GetType().GetField(field, flags).GetValue(obj);
         private static object call(object obj, string method, params object[] args) => obj.GetType().GetMethod(method, flags).Invoke(obj, args);
+        private static void copy_scope(object window, string group) => call(window, "execute_group_copy",
+            Enum.Parse(window.GetType().GetNestedType("copy_group", flags), group));
         private static void require(bool ok, string reason) { if (!ok) throw new Exception(reason); }
         private static GameObject child(GameObject parent, string name)
         {
@@ -66,9 +68,9 @@ namespace D9speed.HumanoidAliasValidation
                 window.GetType().GetField("copySkinnedMeshMaterials", flags).SetValue(window, false);
             }
             public void scan() => call(window, "Scan");
-            public void copy()
+            public void copy(string group = "other")
             {
-                call(window, "ExecuteCopy");
+                copy_scope(window, group);
                 var warnings = (List<string>)get(window, "warnings");
                 require(warnings.Any(w => w.StartsWith("コピー完了:")), string.Join(";", warnings));
             }
@@ -136,18 +138,18 @@ namespace D9speed.HumanoidAliasValidation
                     }
                     require(!((IEnumerable)get(get(f.window, "sourceScan"), "AmbiguousKeys")).Cast<string>().Any(), "False ambiguity");
                     require(resolved(f, "sourceScan", "Hips") == f.source_legs[0].parent, "Unweighted ancestor not recognized");
-                    f.copy(); verify_copy(f);
+                    f.copy(); f.copy("constraint"); verify_copy(f);
                 }
             });
             check("Repeated copy updates existing helper hierarchy without duplicates", () =>
             {
                 using (var f = new fixture())
                 {
-                    f.scan(); f.copy(); f.scan(); f.copy(); verify_copy(f);
+                    f.scan(); f.copy(); f.copy("constraint"); f.scan(); f.copy(); f.copy("constraint"); verify_copy(f);
                     require(f.target.GetComponentsInChildren<SphereCollider>().Length == 6, "Repeated copy duplicated helpers");
                 }
             });
-            check("Copy can be undone as one operation", () =>
+            check("Each category copy can be undone as one operation", () =>
             {
                 using (var f = new fixture())
                 {
@@ -162,7 +164,7 @@ namespace D9speed.HumanoidAliasValidation
                 {
                     var constraint = f.source_legs[0].gameObject.AddComponent<ParentConstraint>();
                     constraint.AddSource(new ConstraintSource { sourceTransform = f.source_legs[1], weight = 1 });
-                    f.scan(); f.copy();
+                    f.scan(); f.copy("constraint");
                     require(f.target_legs[0].GetComponent<ParentConstraint>().GetSource(0).sourceTransform == f.target_legs[1], "Legacy mapping failed");
                 }
             });
@@ -171,7 +173,7 @@ namespace D9speed.HumanoidAliasValidation
                 using (var f = new fixture(true, false))
                 {
                     var second = new List<Transform>(); add_legs(f.source, "second_rig", false, second); add_skin(f.source, second);
-                    f.source_legs[0].gameObject.AddComponent<SphereCollider>(); f.scan(); call(f.window, "ExecuteCopy");
+                    f.source_legs[0].gameObject.AddComponent<SphereCollider>(); f.scan(); copy_scope(f.window, "other");
                     require(((IEnumerable)get(get(f.window, "sourceScan"), "AmbiguousKeys")).Cast<string>().Contains("LeftUpperLeg"), "Two real rigs were silently resolved");
                     require(f.target.GetComponentsInChildren<SphereCollider>().Length == 0, "Ambiguous copy changed target");
                 }
@@ -206,7 +208,7 @@ namespace D9speed.HumanoidAliasValidation
                 {
                     var external = new GameObject("external_avatar_bone"); f.extra.Add(external);
                     f.helpers[0].GetComponent<ParentConstraint>().AddSource(new ConstraintSource { sourceTransform = external.transform, weight = 0.5f });
-                    f.scan(); f.copy();
+                    f.scan(); f.copy("constraint");
                     require(f.target.transform.Find("Cloth_Collider/UpperLeg_L").GetComponent<ParentConstraint>().GetSource(1).sourceTransform == external.transform, "External reference changed");
                 }
             });
@@ -230,7 +232,7 @@ namespace D9speed.HumanoidAliasValidation
                 using (var f = new fixture())
                 {
                     f.scan(); f.source.GetComponentInChildren<SkinnedMeshRenderer>().bones = new[] { f.helpers[0].transform };
-                    call(f.window, "ExecuteCopy");
+                    copy_scope(f.window, "other");
                     require(((List<string>)get(f.window, "warnings")).Any(w => w.StartsWith("プレビュー後に対象が変更")), "Stale preview was accepted");
                     require(f.target.GetComponentsInChildren<SphereCollider>().Length == 0, "Stale preview copied values");
                 }
@@ -322,7 +324,7 @@ namespace D9speed.HumanoidAliasValidation
                     }
                     require(assigned, "VRC constraint source transform property missing"); serialized.ApplyModifiedPropertiesWithoutUndo();
                 }
-                f.scan(); f.copy();
+                f.scan(); f.copy(); f.copy("physbone"); f.copy("constraint");
                 var target_helper = f.target.transform.Find("Cloth_Collider/UpperLeg_L");
                 var copied_constraint = target_helper.GetComponent(constraint_type);
                 var copied_collider = target_helper.GetComponent(collider_type);
@@ -367,7 +369,7 @@ namespace D9speed.HumanoidAliasValidation
                 call(window, "Scan");
                 foreach (var field in new[] { "sourceScan", "targetScan" })
                     require(!((IEnumerable)get(get(window, field), "AmbiguousKeys")).Cast<string>().Any(), field + " remains ambiguous");
-                call(window, "ExecuteCopy");
+                copy_scope(window, "other");
                 require(((List<string>)get(window, "warnings")).Any(w => w.StartsWith("コピー完了:")), string.Join(";", (List<string>)get(window, "warnings")));
                 foreach (var helper in roots[0].transform.Find("Cloth_Collider").Cast<Transform>())
                 {

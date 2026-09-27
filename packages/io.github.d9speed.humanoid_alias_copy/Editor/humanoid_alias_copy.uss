@@ -1,0 +1,35 @@
+.humanoid_alias_copy .d9_header { margin-bottom: var(--d9_space_m); }
+.humanoid_alias_copy .alias_inputs > .d9_field { flex-basis: 0; margin-right: var(--d9_space_s); }
+.humanoid_alias_copy #target_object { margin-right: 0; }
+.humanoid_alias_copy .alias_tabs { flex-direction: row; margin-bottom: var(--d9_space_s); }
+.humanoid_alias_copy .alias_tab {
+    flex-grow: 1;
+    flex-basis: 0;
+    margin-right: var(--d9_space_s);
+    min-height: 38px;
+    border-bottom-width: 3px;
+}
+.humanoid_alias_copy .alias_tab_selected {
+    color: var(--d9_color_selected_text);
+    background-color: var(--d9_color_selected);
+    border-bottom-color: var(--d9_color_brand);
+    -unity-font-style: bold;
+}
+.humanoid_alias_copy #copy_tab_modular_avatar { margin-right: 0; }
+.humanoid_alias_copy .alias_summary { margin: 0 0 var(--d9_space_s) 0; color: var(--d9_color_secondary); }
+.humanoid_alias_copy .alias_table_container { height: 300px; flex-shrink: 0; margin-bottom: var(--d9_space_s); }
+.humanoid_alias_copy .alias_table_container > .d9_table { position: absolute; top: 0; right: 0; bottom: 0; left: 0; min-height: 0; }
+.humanoid_alias_copy .alias_common_table { height: 220px; }
+.humanoid_alias_copy .alias_warnings { max-height: 100px; flex-shrink: 0; margin-bottom: var(--d9_space_s); }
+.humanoid_alias_copy .alias_warnings .unity-help-box { margin: 0; }
+.humanoid_alias_copy .d9_footer .d9_button { min-height: 36px; }
+.humanoid_alias_copy .alias_resolution { height: 360px; flex-shrink: 0; }
+.humanoid_alias_copy .alias_resolution_column { min-width: 240px; padding-right: var(--d9_space_s); }
+.humanoid_alias_copy .alias_detail_title { margin: var(--d9_space_s) 0; -unity-font-style: bold; }
+.humanoid_alias_copy .alias_detail_list { flex-grow: 1; flex-basis: 0; min-height: 80px; background-color: var(--d9_color_input); }
+.humanoid_alias_copy .alias_match_row { flex-direction: row; }
+.humanoid_alias_copy .alias_match_key { width: 120px; flex-shrink: 0; flex-grow: 0; }
+.humanoid_alias_copy .alias_match_score { width: 36px; flex-shrink: 0; flex-grow: 0; }
+.humanoid_alias_copy .alias_match_name { width: 140px; flex-shrink: 0; flex-grow: 0; }
+.humanoid_alias_copy .alias_match_detail { min-width: 120px; }
+.humanoid_alias_copy .alias_zebra { background-color: var(--d9_color_surface); }
