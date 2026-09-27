@@ -9,13 +9,18 @@ using UnityEngine.UIElements;
 
 public partial class HumanoidAliasComponentCopierWindow
 {
-    private enum copy_group { physbone, constraint, modular_avatar, other }
+    private enum copy_group { physbone, constraint, modular_avatar, other, materials }
     [SerializeField] private copy_group active_copy_tab = copy_group.physbone;
     private readonly List<CopyRow> common_copy_rows = new List<CopyRow>();
+    private readonly List<CopyRow> material_copy_rows = new List<CopyRow>();
     private readonly List<Button> copy_tab_buttons = new List<Button>();
     private MultiColumnListView common_copy_list;
     private Label common_summary, copy_empty_label, common_empty_label;
     private Button common_copy_button;
+    private MultiColumnListView material_copy_list;
+    private Label material_empty_label;
+    private Button material_copy_button;
+    private Foldout material_preview_foldout;
     private ScrollView warning_scroll;
 
     private static copy_group get_copy_group(Component component)
@@ -33,6 +38,7 @@ public partial class HumanoidAliasComponentCopierWindow
             case copy_group.physbone: return "VRC PhysBone";
             case copy_group.constraint: return "Unity / VRC Constraint";
             case copy_group.modular_avatar: return "MA";
+            case copy_group.materials: return "SkinnedMeshRenderer マテリアル";
             default: return "その他・共通";
         }
     }
@@ -88,6 +94,7 @@ public partial class HumanoidAliasComponentCopierWindow
         inputs.Add(sourceField); inputs.Add(targetField); settings.Add(inputs);
         sourceField.RegisterValueChangedCallback(_ => Scan());
         targetField.RegisterValueChangedCallback(_ => Scan());
+        settings.Add(build_material_copy_area());
         settings.Add(BuildCopyOptions());
         var actions = EditorUiControls.Row();
         actions.Add(EditorUiControls.Button("スキャン", Scan));
@@ -123,12 +130,9 @@ public partial class HumanoidAliasComponentCopierWindow
         copy_summary = EditorUiControls.Label("", "alias_summary"); preview.Add(copy_summary);
         preview.Add(make_copy_table(copyRows, "copy_preview", out copyListView, out copy_empty_label));
 
-        var common = EditorUiControls.Foldout("その他・共通 (Unity Collider / Contact / Particle / マテリアル)");
+        var common = EditorUiControls.Foldout("その他・共通 (Unity Collider / Contact / Particle)");
         common.name = "common_copy_foldout";
         common.Add(EditorUiControls.Label("この欄の項目は、下の専用ボタンからコピーします。"));
-        copySkinnedMeshMaterialsToggle = EditorUiControls.Toggle("対応するSkinnedMeshのマテリアルもコピー", copySkinnedMeshMaterials,
-            value => { copySkinnedMeshMaterials = value; Scan(); });
-        common.Add(copySkinnedMeshMaterialsToggle);
         common_summary = EditorUiControls.Label("", "alias_summary"); common.Add(common_summary);
         var common_table = make_copy_table(common_copy_rows, "common_copy_preview", out common_copy_list, out common_empty_label);
         common_table.AddToClassList("alias_common_table"); common.Add(common_table);
@@ -144,6 +148,27 @@ public partial class HumanoidAliasComponentCopierWindow
         execute_button.name = "copy_active_tab"; footer.Add(execute_button);
         footer.Add(EditorUiControls.Label("表示中タブのチェック済み項目だけをコピーします。変更はUndoで戻せます。"));
         root.Add(footer); refresh_copy_tabs();
+    }
+
+    private VisualElement build_material_copy_area()
+    {
+        var area = new VisualElement { name = "material_copy_area" };
+        area.AddToClassList("alias_material_copy");
+        var actions = EditorUiControls.Row(false);
+        copySkinnedMeshMaterialsToggle = EditorUiControls.Toggle("対応するSkinnedMeshRendererのマテリアルをコピー", copySkinnedMeshMaterials,
+            value => { copySkinnedMeshMaterials = value; Scan(); });
+        copySkinnedMeshMaterialsToggle.AddToClassList("d9_grow");
+        actions.Add(copySkinnedMeshMaterialsToggle);
+        material_copy_button = EditorUiControls.Button("選択マテリアルをコピー", () => execute_group_copy(copy_group.materials));
+        material_copy_button.name = "copy_materials"; actions.Add(material_copy_button); area.Add(actions);
+        material_preview_foldout = EditorUiControls.Foldout("対象メッシュを確認");
+        material_preview_foldout.name = "material_preview_foldout";
+        var table = make_copy_table(material_copy_rows, "material_copy_preview", out material_copy_list, out material_empty_label);
+        table.AddToClassList("alias_material_table");
+        foreach (var column in new[] { "operation", "component", "method" }) material_copy_list.columns[column].visible = false;
+        material_empty_label.text = "コピーするマテリアル差分はありません。";
+        material_preview_foldout.Add(table); area.Add(material_preview_foldout);
+        return area;
     }
 
     private VisualElement make_copy_table(List<CopyRow> rows, string name, out MultiColumnListView table, out Label empty)

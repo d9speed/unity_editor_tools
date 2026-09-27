@@ -260,6 +260,8 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
         preview_stamp = null;
         copyRows.Clear();
         common_copy_rows.Clear();
+        material_copy_rows.Clear();
+        if (material_preview_foldout != null) material_preview_foldout.text = "対象メッシュを確認";
         if (copy_summary != null) copy_summary.text = "コピー元とコピー先を指定してください。";
         if (common_summary != null) common_summary.text = "コピー元とコピー先を指定してください。";
         if (componentReportView != null) componentReportView.Clear();
@@ -277,10 +279,11 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
         RebuildComponentReport(plan.Components);
         append_preview_rows(plan, copyRows);
         append_preview_rows(common_plan, common_copy_rows);
-        AddSkinnedMeshMaterialPreview(common_copy_rows);
+        AddSkinnedMeshMaterialPreview(material_copy_rows);
         preview_stamp = CapturePreviewStamp();
         copy_summary.text = $"このタブ: 選択 {count_selected(copyRows)} / {plan.Components.Count}件　作成予定の階層: {plan.AddedObjects.Count}件";
         common_summary.text = $"その他・共通: 選択 {count_selected(common_copy_rows)}件　作成予定の階層: {common_plan.AddedObjects.Count}件";
+        material_preview_foldout.text = $"対象メッシュを確認（選択 {count_selected(material_copy_rows)} / {material_copy_rows.Count}件）";
     }
 
     private void append_preview_rows(CopyPlan plan, List<CopyRow> rows)
@@ -446,8 +449,9 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
         }
         var plan = BuildCopyPlan(sourceScan, targetScan, group_to_copy);
         var selected = plan.Components.Where(component => component != null && !excluded_components.Contains(component)).ToList();
-        var copy_materials = group_to_copy == copy_group.other && copySkinnedMeshMaterials;
-        if (selected.Count == 0 && !(copy_materials && common_copy_rows.Any(row => row.IsMaterial && !excluded_materials.Contains(row.SourceComponent)))) return;
+        var copy_materials = group_to_copy == copy_group.materials && copySkinnedMeshMaterials;
+        var material_count = copy_materials ? count_selected(material_copy_rows) : 0;
+        if (selected.Count == 0 && material_count == 0) return;
         if (selected.Any(component => IsAmbiguousPath(component.transform, sourceScan, targetScan)))
         {
             warnings.Add("曖昧な対応が残っています。手動指定するか、そのコンポーネントをチェックから外してください。");
@@ -497,7 +501,8 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             Undo.FlushUndoRecordObjects();
             Undo.CollapseUndoOperations(group);
             EditorSceneManager.MarkSceneDirty(targetScan.Root.scene);
-            warnings.Add($"コピー完了: {copy_group_label(group_to_copy)} / コンポーネント {copiedPairs.Count}件。Undoで一括して戻せます。");
+            var copied_summary = copy_materials ? $"マテリアル {material_count}メッシュ" : $"コンポーネント {copiedPairs.Count}件";
+            warnings.Add($"コピー完了: {copy_group_label(group_to_copy)} / {copied_summary}。Undoで一括して戻せます。");
         }
         catch (Exception exception)
         {
@@ -1220,13 +1225,16 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
         var ready = sourceScan != null && targetScan != null && preview_stamp != null && !EditorApplication.isPlaying;
         execute_button?.SetEnabled(ready && count_selected(copyRows) > 0);
         common_copy_button?.SetEnabled(ready && count_selected(common_copy_rows) > 0);
+        material_copy_button?.SetEnabled(ready && copySkinnedMeshMaterials && count_selected(material_copy_rows) > 0);
         sourceListView?.Rebuild();
         targetListView?.Rebuild();
         unresolvedListView?.Rebuild();
         copyListView?.Rebuild();
         common_copy_list?.Rebuild();
+        material_copy_list?.Rebuild();
         copy_empty_label?.EnableInClassList("d9_hidden", copyRows.Count > 0);
         common_empty_label?.EnableInClassList("d9_hidden", common_copy_rows.Count > 0);
+        material_empty_label?.EnableInClassList("d9_hidden", material_copy_rows.Count > 0);
 
         if (warningBox != null)
         {

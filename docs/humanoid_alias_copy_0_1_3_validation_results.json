@@ -1,0 +1,44 @@
+{
+  "sdk_absent": {
+    "passed": true,
+    "unity": "2022.3.22f1",
+    "checks": [
+      "Exactly three tabs, separate common copy, classification and resizable columns",
+      "Constraint copy changes checked rows only; other tabs, materials and common colliders stay unchanged; Undo",
+      "Missing hierarchy is created only for checked components in the active tab",
+      "Common copy changes only selected common components, leaving materials unchanged",
+      "Upper material copy respects mesh selection, leaves all components unchanged, supports Undo and disabling",
+      "physbone_dark layout, theme and footer",
+      "physbone_light layout, theme and footer",
+      "narrow layout, theme and footer",
+      "constraint_dark layout, theme and footer",
+      "Real checkbox events persist across tabs; all unchecked disables copy and execution is a no-op",
+      "ma_dark layout, theme and footer",
+      "materials_expanded layout, theme and footer",
+      "Material table checkbox excludes the mesh and keeps its selection across tabs"
+    ],
+    "errors": []
+  },
+  "sdk_and_ma": {
+    "passed": true,
+    "unity": "2022.3.22f1",
+    "checks": [
+      "Exactly three tabs, separate common copy, classification and resizable columns",
+      "Constraint copy changes checked rows only; other tabs, materials and common colliders stay unchanged; Undo",
+      "Missing hierarchy is created only for checked components in the active tab",
+      "Common copy changes only selected common components, leaving materials unchanged",
+      "Upper material copy respects mesh selection, leaves all components unchanged, supports Undo and disabling",
+      "PhysBone tab copies colliders and remaps references without copying other categories",
+      "MA tab copies MA only",
+      "physbone_dark layout, theme and footer",
+      "physbone_light layout, theme and footer",
+      "narrow layout, theme and footer",
+      "constraint_dark layout, theme and footer",
+      "Real checkbox events persist across tabs; all unchecked disables copy and execution is a no-op",
+      "ma_dark layout, theme and footer",
+      "materials_expanded layout, theme and footer",
+      "Material table checkbox excludes the mesh and keeps its selection across tabs"
+    ],
+    "errors": []
+  }
+}

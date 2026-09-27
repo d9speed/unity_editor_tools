@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 - 2026-09-27
+
+- SkinnedMeshRendererのマテリアルコピーを、上部のコピー元・コピー先の直下へ移動。
+- 対象メッシュの確認・個別選択と専用コピーボタンを上部にまとめ、マテリアルだけをコピー可能に。
+- 「その他・共通」はUnity Collider・Contact・Particle専用に変更。
+
 ## 0.1.2 - 2026-09-27
 
 - コピー一覧をVRC PhysBone（Collider含む）、Unity / VRC Constraint、MAの3タブへ分類。

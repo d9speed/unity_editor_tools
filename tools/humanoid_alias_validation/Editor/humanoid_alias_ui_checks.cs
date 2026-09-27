@@ -134,16 +134,36 @@ namespace D9speed.HumanoidAliasValidation
                     require(f.target.transform.Find("unchecked_constraint") == null && f.target.transform.Find("new_common") == null, "Unselected hierarchy created");
                 }
             });
-            check("Common copy changes only selected common components and materials", () =>
+            check("Common copy changes only selected common components, leaving materials unchanged", () =>
             {
                 using (var f = new fixture())
                 {
                     call(f.window, "execute_group_copy", group("other"));
-                    require(Mathf.Approximately(f.target_collider.radius, 0.23f) && f.target_skin.sharedMaterial == f.source_material, "Common values not copied");
+                    require(Mathf.Approximately(f.target_collider.radius, 0.23f) && f.target_skin.sharedMaterial == f.target_material, "Common copy scope incorrect");
                     require(Mathf.Approximately(f.target_constraint.weight, 0.1f), "Constraint changed");
                     if (f.target_pb != null) require(Mathf.Approximately(f.pb_radius, 0.1f), "PhysBone changed");
                     if (f.target_ma != null) require(f.ma_priority == 4, "MA changed");
                     Undo.PerformUndo(); require(Mathf.Approximately(f.target_collider.radius, 0.7f) && f.target_skin.sharedMaterial == f.target_material, "Common Undo failed");
+                }
+            });
+            check("Upper material copy respects mesh selection, leaves all components unchanged, supports Undo and disabling", () =>
+            {
+                using (var f = new fixture())
+                {
+                    var source_second = child(f.source, "second_mesh").AddComponent<SkinnedMeshRenderer>(); source_second.sharedMaterial = f.source_material;
+                    var target_second = child(f.target, "second_mesh").AddComponent<SkinnedMeshRenderer>(); target_second.sharedMaterial = f.target_material;
+                    ((HashSet<Component>)get(f.window, "excluded_materials")).Add(source_second); call(f.window, "Scan");
+                    require(f.window.rootVisualElement.Q<Button>("copy_materials").enabledSelf, "Material button disabled");
+                    call(f.window, "execute_group_copy", group("materials"));
+                    require(f.target_skin.sharedMaterial == f.source_material && target_second.sharedMaterial == f.target_material, "Material selection ignored");
+                    require(Mathf.Approximately(f.target_constraint.weight, 0.1f) && Mathf.Approximately(f.target_collider.radius, 0.7f), "Components changed");
+                    if (f.target_pb != null) require(Mathf.Approximately(f.pb_radius, 0.1f), "PhysBone changed");
+                    if (f.target_ma != null) require(f.ma_priority == 4, "MA changed");
+                    Undo.PerformUndo(); require(f.target_skin.sharedMaterial == f.target_material, "Material Undo failed");
+                    ((Toggle)get(f.window, "copySkinnedMeshMaterialsToggle")).value = false;
+                    require(!f.window.rootVisualElement.Q<Button>("copy_materials").enabledSelf, "Disabled material copy available");
+                    call(f.window, "execute_group_copy", group("materials"));
+                    require(f.target_skin.sharedMaterial == f.target_material, "Disabled material copy changed target");
                 }
             });
             if (find_type("VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone") != null)
@@ -173,7 +193,7 @@ namespace D9speed.HumanoidAliasValidation
         private static void open_scenario()
         {
             frames = 0; current = new fixture();
-            current.window.position = new Rect(0, 0, scenario == 2 ? 860 : 1200, scenario == 2 ? 620 : 850);
+            current.window.position = new Rect(0, 0, scenario == 2 ? 860 : 1200, scenario == 2 ? 620 : scenario == 5 ? 1000 : 850);
             current.select(current.source_pb == null || scenario == 3 ? "constraint" : scenario == 4 ? "modular_avatar" : "physbone");
             var panel_type = typeof(VisualElement).Assembly.GetType("UnityEngine.UIElements.Panel", true);
             panel = (IPanel)panel_type.GetMethod("CreateEditorPanel", flags).Invoke(null, new object[] { current.window });
@@ -183,6 +203,7 @@ namespace D9speed.HumanoidAliasValidation
             panel.visualTree.Add(current.window.rootVisualElement);
             current.window.rootVisualElement.EnableInClassList("d9_theme_light", !dark);
             current.window.rootVisualElement.EnableInClassList("d9_theme_dark", dark);
+            if (scenario == 5) current.window.rootVisualElement.Q<Foldout>("material_preview_foldout").value = true;
             layout();
         }
         private static void tick()
@@ -191,7 +212,7 @@ namespace D9speed.HumanoidAliasValidation
             try
             {
                 layout();
-                string name = new[] { "physbone_dark", "physbone_light", "narrow", "constraint_dark", "ma_dark" }[scenario];
+                string name = new[] { "physbone_dark", "physbone_light", "narrow", "constraint_dark", "ma_dark", "materials_expanded" }[scenario];
                 check(name + " layout, theme and footer", () =>
                 {
                     var root = current.window.rootVisualElement; var table = root.Q<MultiColumnListView>("copy_preview");
@@ -203,11 +224,24 @@ namespace D9speed.HumanoidAliasValidation
                     require(footer.yMin >= 0 && footer.yMax <= root.worldBound.yMax + 1 && footer.xMax <= root.worldBound.xMax + 1, "Footer clipped");
                     var tabs = root.Q("copy_tabs").worldBound;
                     require(tabs.yMax < footer.yMin && tabs.xMax <= root.worldBound.xMax + 1, "Tabs clipped");
+                    var materials = root.Q<Button>("copy_materials").worldBound;
+                    require(materials.yMin > root.Q<ObjectField>("source_object").worldBound.yMax && materials.yMax < tabs.yMin, "Material copy is not above tabs and below inputs");
+                    require(materials.xMax <= root.worldBound.xMax + 1, "Material button clipped");
+                    require(root.Q<Foldout>("common_copy_foldout").Q<Button>("copy_materials") == null, "Material copy still nested in common section");
                 });
                 capture(name);
                 if (scenario == 3) check("Real checkbox events persist across tabs; all unchecked disables copy and execution is a no-op", checkbox_interaction);
+                if (scenario == 5) check("Material table checkbox excludes the mesh and keeps its selection across tabs", () =>
+                {
+                    var table = current.window.rootVisualElement.Q<MultiColumnListView>("material_copy_preview");
+                    var toggle = table.Q<Toggle>(className: "d9_table_check"); require(toggle != null && toggle.value, "Material checkbox missing");
+                    toggle.value = false; current.select("constraint"); current.select("physbone");
+                    require(((HashSet<Component>)get(current.window, "excluded_materials")).Contains(current.source_skin), "Material selection lost");
+                    require(!current.window.rootVisualElement.Q<Button>("copy_materials").enabledSelf, "Unselected material can be copied");
+                    call(current.window, "execute_group_copy", group("materials")); require(current.target_skin.sharedMaterial == current.target_material, "Unselected material changed");
+                });
                 panel.Dispose(); current.Dispose();
-                if (++scenario < 5) { open_scenario(); return; }
+                if (++scenario < 6) { open_scenario(); return; }
             }
             catch (Exception e) { errors.Add(e.ToString()); }
             EditorApplication.update -= tick; Application.logMessageReceived -= log;
