@@ -16,7 +16,8 @@ public static class blend_shape_search_checks
     {
         "bs:smile", "bs:SMILE", "bs:\"happy face\"", "bs:missing",
         "h:t:SkinnedMeshRenderer bs:smile", "h:t:SkinnedMeshRenderer bs:SMILE",
-        "h:t:SkinnedMeshRenderer bs:\"happy face\"", "h:t:SkinnedMeshRenderer bs:missing"
+        "h:t:SkinnedMeshRenderer bs:\"happy face\"", "h:t:SkinnedMeshRenderer bs:missing",
+        "h:t:Skinnedmeshrenderer bs:smile"
     };
 
     public static void Run()
@@ -54,7 +55,7 @@ public static class blend_shape_search_checks
     {
         try
         {
-            if (query_index == 0 || query_index == 1 || query_index == 4 || query_index == 5)
+            if (query_index == 0 || query_index == 1 || query_index == 4 || query_index == 5 || query_index == 8)
             {
                 require(results.Count == 1, "Expected one smile result, got " + results.Count);
                 require(results[0].ToObject<GameObject>() == smile_object, "Wrong GameObject returned");
