@@ -20,6 +20,7 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 | Hierarchyの右クリック → `Copy Animation Property Path` | 最も近いAnimatorを基準にしたパスをコピー。なければPrefabルート、シーンルートを使用 |
 | Hierarchyの右クリック → `選択オブジェクト名をコピー` | 選択したオブジェクト名を `Body,Skirt,Glasses` のようにカンマ区切りでコピー。親子の同時選択・非アクティブ・同名オブジェクトにも対応 |
 | Hierarchyの右クリック → `このヒエラルキー配下を検索` | 選択階層のパスをUnity Searchで検索 |
+| Unity Search → `bs:smile` | 読み込み中のシーンのSkinnedMeshRendererで、名前に`smile`を含むブレンドシェイプを検索。結果からGameObjectを選択 |
 | Componentの右クリック → `コンポーネント名をコピー` | コンポーネントの型名をコピー |
 | Componentの右クリック → `ここから下のコンポーネントをコピー` | 選択コンポーネント以降をまとめてコピー |
 | Component／Hierarchyの右クリック → `コピーしたコンポーネントを新規貼り付け` | シーンオブジェクトへ追加。Undo対応 |
@@ -33,6 +34,10 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 Transform Resetの割り当てはUnityのShortcutsにある`Custom/ShortCutEX/TransformReset`で変更できます。
 
 Inspectorのロックは `Edit > Shortcuts` の `Custom/ShortCutEX/InspectorLock` で割り当てを変更できます。初期設定はCtrl+L（macOSはCmd+L）です。同じキーを使う別の操作がある場合は、Shortcutsで割り当てを調整してください。複数のInspectorがある場合は、フォーカス中のInspector、マウス下のInspector、開いているInspectorの先頭の順に1つだけ切り替えます。HierarchyやSceneからも操作でき、Inspectorが開いていない場合は何もしません。
+
+### ブレンドシェイプ名の検索
+
+Unity Searchで`bs:smile`のように入力します。`bs:`はEditor Coreが追加する専用プロバイダで、読み込み中のシーンにあるSkinnedMeshRendererの`sharedMesh`を調べます。名前の一部で検索でき、大文字小文字は区別しません。空白を含む名前は`bs:"happy smile"`と入力します。検索結果には該当GameObjectと一致したブレンドシェイプ名を表示し、EnterまたはダブルクリックでGameObjectを選択します。メッシュが未設定のRendererや、読み込まれていないシーン・Prefabアセットは対象外です。
 
 ### Transform MirrorのUI
 
