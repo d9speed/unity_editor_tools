@@ -15,4 +15,6 @@ Unity 2022.3.22f1の検証プロジェクト`guide_board_core_validation`でパ�
 - サイズ: 72,994 bytes
 - SHA-256: `84dc8a9ddf2c62d658d5e87e55ce438c240ccd7807cf4e3481549c4209414744`
 
-Unity Searchウィンドウでの手操作と、複数の大規模シーンでの応答時間は未検証です。
+公開後、[VPM一覧](https://d9speed.github.io/Unity_Tools/index.json)に0.1.12と上記SHA-256が表示されること、[案内ページ](https://d9speed.github.io/Unity_Tools/)にBlendShape Searchが表示されることを確認しました。認証なしでGitHub ReleaseのZIPをダウンロードし、サイズとSHA-256が手元のZIPと一致しました。
+
+Unity Searchウィンドウでの手操作、VCC / ALCOM画面からの導入、複数の大規模シーンでの応答時間は未検証です。
