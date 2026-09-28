@@ -17,7 +17,7 @@ namespace D9speed_BaseEditorUtils
                 return;
             }
 
-            EditorUtility.DisplayDialog("説明板プレハブ", "この機能には TextMeshPro 3.0.x が必要です。Window > Package Manager から TextMeshPro を導入してください。", "閉じる");
+            EditorUtility.DisplayDialog("説明板プレハブ", "説明板の編集画面を読み込めませんでした。Editor Coreを再導入してください。", "閉じる");
         }
     }
 }

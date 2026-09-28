@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.10 - 2026-09-28
+
+- 説明画像の文字描画をWindowsシステムフォント利用の同梱DLLへ分離し、TextMeshPro依存を削除。
+- Unity内の画面を文章入力・プレビュー・PNG／Prefab保存に整理。メイリオが利用可能なら選択し、文字サイズを自動調整。
+- 画像は1024×512 pxのPNGとしてDLLから返し、Editor Coreが既存のPNG・Unlitマテリアル・EditorOnlyのQuadプレハブ保存を担当。
+
 ## 0.1.9 - 2026-09-26
 
 - `D9speed/Tools/説明画像つき板ポリプレハブ作成(EditorOnly)` を追加。文章・TMPフォント・文字色・背景色・解像度を調整し、PNGとUnlitマテリアルを参照するEditorOnlyのQuadプレハブを保存。

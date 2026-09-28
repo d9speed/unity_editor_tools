@@ -3,11 +3,11 @@
 D9speedのEditor拡張が共有する補助処理と、普段使いの右クリックメニューです。オブジェクト検索、ヒューマノイド対応付け、階層パス、コンポーネントコピー、ファイル名の処理に加えて、Unity Utilityの各機能を収録します。
 
 - 対応基準: Unity 2022.3.22f1。
-- Editor専用。VRChat SDK、外部DLL、専用Runtimeは不要です。
+- Editor専用。VRChat SDKは不要です。説明板の描画にはWindows用の同梱DLLを使用します。
 - アセンブリ名: `D9speed.EditorUtils`。
 - 名前空間: `D9speed_BaseEditorUtils`。
 
-説明板プレハブ作成は任意のTextMeshPro連携アセンブリ `D9speed.EditorUtils.GuideBoard` を使用します。作成時はTextMeshPro 3.0.xとTMP Essential Resourcesが必要です。TMP未導入でもCoreの既存機能は利用できます。
+説明板プレハブ作成は `D9speed.EditorUtils.GuideBoard` と `Renderer~/guide_board_renderer.dll` を使用します。DLLはWindows標準のフォント描画機能でPNGを生成します。TextMeshPro・TMP Essential Resources・別途インストールするフォントアセットは不要です。
 
 `FindSceneObjects<T>()`は有効なシーンオブジェクトを取得します。`true`を渡すと非アクティブも含めます。`GetObjectId()`はEditorセッション内の識別子を返します。
 
@@ -57,22 +57,22 @@ VRChat SDKは必須依存にせず、導入されている場合に対応しま�
 
 ## 説明画像つき板ポリプレハブ
 
-Unity 2022.3 / Built-in Render Pipeline用のEditor専用ツールです。TextMeshPro 3.0.xをPackage Managerから導入し、初回は `Window > TextMeshPro > Import TMP Essential Resources` を実行してください。
+Unity 2022.3 / Windows用のEditor専用ツールです。画像生成にはWindowsのシステムフォントを使います。板ポリゴンのマテリアルはBuilt-in Render Pipelineの `Unlit/Texture` を使います。
 
 1. `D9speed/Tools/説明画像つき板ポリプレハブ作成(EditorOnly)` を開きます。
-2. TMPフォントを選び、文章・文字サイズ・余白・揃え方・文字色・背景色を調整します。
+2. 文章を入力します。Windowsにメイリオがあれば自動で使用し、文章量に合わせて文字サイズを調整します。
 3. プレビューを確認して「プレハブを保存…」を押し、Assets内の保存先を選びます。
 4. 作成したプレハブを必要な場所に配置します。
 
 同じフォルダーへ `.prefab`、`_image.png`、`_material.mat` を保存します。既存のアセットは上書きせず、同名の場合は連番を付けます。プレハブは `EditorOnly` タグ付き、ColliderなしのQuadで、高さ1 m・幅は画像の縦横比に合わせます。Unity標準のQuadと `Unlit/Texture` を使うため、正面はローカル-Z側です。シーンへ自動配置はしません。ビルドではEditorOnlyの説明板が除外されます。PNG単体の保存も可能です。
 
-日本語を含む場合は、対応する `.ttf` / `.otf` から作成したTMPフォントを選んでください。標準のLiberationSans SDFには日本語がありません。フォントの使用条件に従ってください。作成されたプレハブはPNGとマテリアルを参照し、TMP・フォント・専用スクリプトを参照しません。
+日本語の描画にはWindowsのシステムフォントを使います。メイリオがない環境では既定のシステムフォントに切り替わるため、描画結果をプレビューで確認してください。フォントファイルは配布物に含めません。作成されたプレハブはPNGとマテリアルだけを参照し、フォントや専用スクリプトを参照しません。
 
-- 解像度は各辺64〜2048 px。自動折り返し・改行・左／中央／右揃えに対応します。リッチテキストは解釈しません。
-- 文字が枠に収まらない場合は警告し、保存時に確認します。フォントにない文字がある場合は保存を無効にします。
-- 変更から100 ms後に描画し、同じ解像度のRenderTextureを再利用します。ウィンドウを閉じるとプレビュー用シーン・描画リソースを解放します。
-- 共通UIのライト／ダーク・フォント設定を引き継ぎます。入力はスクリプトの再コンパイル時に保持しますが、文書やプリセットの永続保存はありません。
-- Assets内のPNGは無圧縮・sRGB・Mip Mapなし・Clampで保存します。透過PNGとURP/HDRPは対象外です。
+- PNGは1024×512 px、白背景・濃い文字・40 px余白です。自動折り返し・改行に対応し、文字サイズを12〜48 pxで自動調整します。リッチテキストは解釈しません。
+- 最小サイズでも文字が収まらない場合は警告し、保存時に確認します。フォント不足時の代替字形はプレビューで確認してください。
+- 変更から100 ms後に描画します。Editor CoreはDLLから受け取ったPNGをプレビューに表示し、ウィンドウ終了時にテクスチャを解放します。
+- 共通UIのライト／ダーク・フォント設定を引き継ぎます。文章はスクリプトの再コンパイル時に保持しますが、文書やプリセットの永続保存はありません。
+- Assets内のPNGは無圧縮・sRGB・Mip Mapなし・Clampで保存します。透過PNGは対象外です。URP/HDRPでの板ポリゴン表示は検証対象外です。
 
 ## 設定
 
