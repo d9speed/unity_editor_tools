@@ -30,4 +30,4 @@ Unity 2022.3.22f1のTMP・uGUI未導入の専用プロジェクト `guide_board_
 
 ## 範囲
 
-DLLはWindows用です。Unity画面の手操作、macOS、URP/HDRPの板ポリゴン表示、他言語のシステムフォントは未検証です。VPM公開URLへの反映は別作業です。
+DLLはWindows用です。Unity画面の手操作、macOS、URP/HDRPの板ポリゴン表示、他言語のシステムフォントは未検証です。Editor Core 0.1.10のZIPはGitHub Releaseに公開し、VPM一覧へ追加しました。
