@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13 - 2026-09-28
+
+- Hierarchy検索に`bs:`フィルターを追加。`h:t:SkinnedMeshRenderer bs:smile`でコンポーネント種別とブレンドシェイプ名を組み合わせて検索できるようにした。従来の単独検索`bs:smile`も維持。
+
 ## 0.1.12 - 2026-09-28
 
 - Unity Searchに`bs:`プロバイダを追加。`bs:smile`で読み込み中のシーンにあるSkinnedMeshRendererのブレンドシェイプ名を部分一致・大文字小文字を区別せず検索し、該当GameObjectを選択できるようにした。

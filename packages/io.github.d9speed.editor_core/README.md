@@ -20,7 +20,7 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 | Hierarchyの右クリック → `Copy Animation Property Path` | 最も近いAnimatorを基準にしたパスをコピー。なければPrefabルート、シーンルートを使用 |
 | Hierarchyの右クリック → `選択オブジェクト名をコピー` | 選択したオブジェクト名を `Body,Skirt,Glasses` のようにカンマ区切りでコピー。親子の同時選択・非アクティブ・同名オブジェクトにも対応 |
 | Hierarchyの右クリック → `このヒエラルキー配下を検索` | 選択階層のパスをUnity Searchで検索 |
-| Unity Search → `bs:smile` | 読み込み中のシーンのSkinnedMeshRendererで、名前に`smile`を含むブレンドシェイプを検索。結果からGameObjectを選択 |
+| Unity Search → `bs:smile` / `h:t:SkinnedMeshRenderer bs:smile` | 読み込み中のシーンのSkinnedMeshRendererで、名前に`smile`を含むブレンドシェイプを検索。結果からGameObjectを選択 |
 | Componentの右クリック → `コンポーネント名をコピー` | コンポーネントの型名をコピー |
 | Componentの右クリック → `ここから下のコンポーネントをコピー` | 選択コンポーネント以降をまとめてコピー |
 | Component／Hierarchyの右クリック → `コピーしたコンポーネントを新規貼り付け` | シーンオブジェクトへ追加。Undo対応 |
@@ -38,6 +38,8 @@ Inspectorのロックは `Edit > Shortcuts` の `Custom/ShortCutEX/InspectorLock
 ### ブレンドシェイプ名の検索
 
 Unity Searchで`bs:smile`のように入力します。`bs:`はEditor Coreが追加する専用プロバイダで、読み込み中のシーンにあるSkinnedMeshRendererの`sharedMesh`を調べます。名前の一部で検索でき、大文字小文字は区別しません。空白を含む名前は`bs:"happy smile"`と入力します。検索結果には該当GameObjectと一致したブレンドシェイプ名を表示し、EnterまたはダブルクリックでGameObjectを選択します。メッシュが未設定のRendererや、読み込まれていないシーン・Prefabアセットは対象外です。
+
+Unity標準のHierarchy検索にも`bs:`フィルターを追加しています。`h:t:SkinnedMeshRenderer bs:smile`と入力すると、コンポーネント種別とブレンドシェイプ名を組み合わせて絞り込めます。空白を含む名前は`h:t:SkinnedMeshRenderer bs:"happy face"`と入力します。こちらの結果表示と選択操作はUnity標準のHierarchy検索に従います。
 
 ### Transform MirrorのUI
 

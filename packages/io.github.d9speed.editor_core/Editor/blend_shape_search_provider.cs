@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Search;
+using UnityEditor.Search.Providers;
 using UnityEngine;
 
 namespace D9speed_BaseEditorUtils
@@ -9,6 +10,23 @@ namespace D9speed_BaseEditorUtils
     internal static class blend_shape_search_provider
     {
         private const string provider_id = "d9speed_blend_shapes";
+
+        [SceneQueryEngineFilter("bs", StringComparison.OrdinalIgnoreCase, new[] { ":" })]
+        internal static string get_blend_shape_names(GameObject game_object)
+        {
+            var shape_names = new List<string>();
+            foreach (var renderer in game_object.GetComponents<SkinnedMeshRenderer>())
+            {
+                var mesh = renderer.sharedMesh;
+                if (mesh == null)
+                    continue;
+
+                for (var index = 0; index < mesh.blendShapeCount; index++)
+                    shape_names.Add(mesh.GetBlendShapeName(index));
+            }
+
+            return shape_names.Count == 0 ? null : string.Join("\u0000", shape_names);
+        }
 
         [SearchItemProvider]
         internal static SearchProvider create_provider()

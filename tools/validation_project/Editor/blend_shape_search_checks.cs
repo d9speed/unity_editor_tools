@@ -12,7 +12,12 @@ public static class blend_shape_search_checks
     private static SearchContext current_context;
     private static int query_index;
     private static double started_at;
-    private static readonly string[] queries = { "bs:smile", "bs:SMILE", "bs:\"happy face\"", "bs:missing" };
+    private static readonly string[] queries =
+    {
+        "bs:smile", "bs:SMILE", "bs:\"happy face\"", "bs:missing",
+        "h:t:SkinnedMeshRenderer bs:smile", "h:t:SkinnedMeshRenderer bs:SMILE",
+        "h:t:SkinnedMeshRenderer bs:\"happy face\"", "h:t:SkinnedMeshRenderer bs:missing"
+    };
 
     public static void Run()
     {
@@ -40,7 +45,8 @@ public static class blend_shape_search_checks
     private static void run_next_query()
     {
         current_context = SearchService.CreateContext(queries[query_index]);
-        require(current_context.filterId == "bs:", "The bs: filter was not selected");
+        var expected_filter = query_index < 4 ? "bs:" : "h:";
+        require(current_context.filterId == expected_filter, "Unexpected provider for " + queries[query_index]);
         SearchService.Request(current_context, on_search_completed, SearchFlags.WantsMore);
     }
 
@@ -48,13 +54,14 @@ public static class blend_shape_search_checks
     {
         try
         {
-            if (query_index < 2)
+            if (query_index == 0 || query_index == 1 || query_index == 4 || query_index == 5)
             {
                 require(results.Count == 1, "Expected one smile result, got " + results.Count);
                 require(results[0].ToObject<GameObject>() == smile_object, "Wrong GameObject returned");
-                require(results[0].GetDescription(context).Contains("Smile_Left"), "Matched shape name is missing");
+                if (query_index < 4)
+                    require(results[0].GetDescription(context).Contains("Smile_Left"), "Matched shape name is missing");
             }
-            else if (query_index == 2)
+            else if (query_index == 2 || query_index == 6)
             {
                 require(results.Count == 1 && results[0].ToObject<GameObject>() == happy_object,
                     "Quoted shape name match failed");
