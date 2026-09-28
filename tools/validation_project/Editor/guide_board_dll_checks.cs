@@ -41,6 +41,8 @@ namespace D9speed.PackageValidation
                 var scene = SceneManager.GetActiveScene();
                 var was_dirty = scene.isDirty;
                 int preview_scenes = EditorSceneManager.previewSceneCount;
+                var installed_fonts = (string[])preview_type.GetMethod("get_font_families", members).Invoke(null, null);
+                check(installed_fonts.Length > 0, "installed_windows_fonts_are_listed");
                 using (var preview = (IDisposable)Activator.CreateInstance(preview_type, true))
                 {
                     invoke(preview, "render", settings);
@@ -91,10 +93,21 @@ namespace D9speed.PackageValidation
                     check(EditorSceneManager.previewSceneCount == preview_scenes && SceneManager.GetActiveScene() == scene && scene.isDirty == was_dirty,
                         "user_scene_is_unchanged");
 
+                    settings_type.GetField("text", members).SetValue(settings, "FONT CHOICE ABC 123");
+                    settings_type.GetField("font_name", members).SetValue(settings, installed_fonts[0]);
+                    invoke(preview, "render", settings);
+                    check(get<int>(preview, "render_count") == 2 && ((byte[])invoke(preview, "encode_png")).Length > 0,
+                        "selected_font_renders_png");
+                    settings_type.GetField("font_name", members).SetValue(settings, "missing_font_for_guide_board_check");
+                    try { invoke(preview, "render", settings); throw new InvalidOperationException("Missing font was accepted."); }
+                    catch (TargetInvocationException error) when (error.InnerException is InvalidOperationException) { }
+                    settings_type.GetField("font_name", members).SetValue(settings, string.Empty);
+                    check(get<int>(preview, "render_count") == 2, "missing_font_is_rejected");
+
                     settings_type.GetField("text", members).SetValue(settings, new string('長', 3000));
                     invoke(preview, "render", settings);
                     check(get<bool>(preview, "text_overflows"), "long_text_overflow_detected");
-                    check(get<int>(preview, "render_count") == 2, "preview_updates_after_text_change");
+                    check(get<int>(preview, "render_count") == 3, "preview_updates_after_text_change");
                 }
 
                 var window_type = assembly.GetType("D9speed_BaseEditorUtils.GuideBoard.guide_board_window", true);
@@ -106,9 +119,17 @@ namespace D9speed.PackageValidation
                         window.rootVisualElement.Q<Image>("preview_image") != null &&
                         window.rootVisualElement.Q<Button>("prefab_button") != null,
                         "unity_ui_has_text_preview_and_save");
-                    check(window.rootVisualElement.Q<VisualElement>("font_field") == null &&
+                    var font_field = window.rootVisualElement.Q<DropdownField>("font_field");
+                    check(font_field != null && font_field.choices.Count > 1 &&
                         window.rootVisualElement.Q<VisualElement>("width_field") == null,
-                        "unity_ui_has_no_font_or_layout_controls");
+                        "unity_ui_lists_fonts_without_layout_controls");
+                    invoke(window, "select_font", installed_fonts[0]);
+                    var window_settings = window_type.GetField("settings", members).GetValue(window);
+                    check((string)settings_type.GetField("font_name", members).GetValue(window_settings) == installed_fonts[0],
+                        "font_selection_updates_settings");
+                    invoke(window, "select_font", font_field.choices[0]);
+                    check((string)settings_type.GetField("font_name", members).GetValue(window_settings) == string.Empty,
+                        "automatic_font_selection_is_preserved");
                     check(window.rootVisualElement.ClassListContains("d9_ui_root"), "shared_theme_applied");
                     invoke(window, "render_preview");
                     check(window.rootVisualElement.Q<Button>("prefab_button").enabledSelf, "preview_enables_prefab_save");

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -8,6 +9,7 @@ namespace D9speed_BaseEditorUtils.GuideBoard
 {
     public sealed class guide_board_window : EditorWindow
     {
+        private const string automatic_font_label = "自動（メイリオ優先）";
         [SerializeField] private guide_board_settings settings = new guide_board_settings();
         [SerializeField] private string last_save_directory = "Assets";
         private guide_board_preview preview;
@@ -41,6 +43,26 @@ namespace D9speed_BaseEditorUtils.GuideBoard
             export_button = rootVisualElement.Q<Button>("export_button");
             prefab_button = rootVisualElement.Q<Button>("prefab_button");
 
+            var font_field = rootVisualElement.Q<DropdownField>("font_field");
+            try
+            {
+                var installed_fonts = guide_board_preview.get_font_families();
+                var choices = new List<string>(installed_fonts.Length + 1) { automatic_font_label };
+                choices.AddRange(installed_fonts);
+                font_field.choices = choices;
+                var selected_font = Array.Find(installed_fonts, name =>
+                    string.Equals(name, settings.font_name, StringComparison.OrdinalIgnoreCase));
+                settings.font_name = selected_font ?? string.Empty;
+                font_field.SetValueWithoutNotify(selected_font ?? automatic_font_label);
+                font_field.RegisterValueChangedCallback(e => select_font(e.newValue));
+            }
+            catch (Exception exception)
+            {
+                font_field.SetEnabled(false);
+                set_status(exception.Message, true);
+                Debug.LogException(exception);
+            }
+
             bind<TextField, string>("text_field", settings.text, value => settings.text = value);
             rootVisualElement.Q<Button>("refresh_button").clicked += render_preview;
             export_button.clicked += export_png;
@@ -53,6 +75,12 @@ namespace D9speed_BaseEditorUtils.GuideBoard
             var field = rootVisualElement.Q<TField>(field_name);
             field.SetValueWithoutNotify(value);
             field.RegisterValueChangedCallback(e => { changed(e.newValue); schedule_render(); });
+        }
+
+        private void select_font(string value)
+        {
+            settings.font_name = value == automatic_font_label ? string.Empty : value;
+            schedule_render();
         }
 
         private void schedule_render()
@@ -85,7 +113,8 @@ namespace D9speed_BaseEditorUtils.GuideBoard
                 if (preview.text_overflows)
                     set_status("文章が枠からはみ出しています。文章を短くしてください。", true);
                 else
-                    set_status("Windowsのシステムフォントで描画しました。PNGまたはEditorOnlyのプレハブを保存できます。");
+                    set_status("フォント: " + (string.IsNullOrEmpty(settings.font_name) ? "自動" : settings.font_name) +
+                        "。PNGまたはEditorOnlyのプレハブを保存できます。");
                 export_button.SetEnabled(true);
                 prefab_button.SetEnabled(true);
             }

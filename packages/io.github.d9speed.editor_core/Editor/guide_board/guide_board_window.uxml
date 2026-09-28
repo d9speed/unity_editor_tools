@@ -7,8 +7,9 @@
         </ui:VisualElement>
         <ui:VisualElement class="body">
             <ui:ScrollView class="settings_panel">
+                <ui:DropdownField name="font_field" label="フォント" />
                 <ui:TextField name="text_field" label="文章" multiline="true" class="text_field" />
-                <ui:Label text="Meiryoが利用できる場合は自動で使用します。画像は1024×512 px、白背景です。文字サイズは文章量に合わせて調整します。" class="hint" />
+                <ui:Label text="Windowsに入っているフォントから選べます。自動ではメイリオを優先します。画像は1024×512 px、白背景です。" class="hint" />
             </ui:ScrollView>
             <ui:VisualElement class="preview_panel">
                 <ui:VisualElement class="preview_header">

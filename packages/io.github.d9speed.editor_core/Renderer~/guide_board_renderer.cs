@@ -17,15 +17,31 @@ namespace D9speed.GuideBoardRenderer
     {
         public static RenderedImage RenderText(string text)
         {
+            return RenderText(text, null);
+        }
+
+        public static RenderedImage RenderText(string text, string font_name)
+        {
             const int width = 1024;
             const int height = 512;
             const int padding = 40;
             var fonts = GetFontFamilies();
             if (fonts.Length == 0) throw new InvalidOperationException("Windowsのシステムフォントを取得できません。");
-            var font_name = Array.Find(fonts, name =>
-                string.Equals(name, "Meiryo", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(name, "メイリオ", StringComparison.OrdinalIgnoreCase));
-            if (font_name == null) font_name = SystemFonts.DefaultFont.FontFamily.Name;
+            if (string.IsNullOrWhiteSpace(font_name))
+            {
+                font_name = Array.Find(fonts, name =>
+                    string.Equals(name, "Meiryo", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(name, "メイリオ", StringComparison.OrdinalIgnoreCase));
+                if (font_name == null) font_name = SystemFonts.DefaultFont.FontFamily.Name;
+            }
+            else
+            {
+                var selected_font = Array.Find(fonts, name =>
+                    string.Equals(name, font_name, StringComparison.OrdinalIgnoreCase));
+                if (selected_font == null)
+                    throw new ArgumentException("指定フォントがWindowsに見つかりません: " + font_name, "font_name");
+                font_name = selected_font;
+            }
 
             int low = 12;
             int high = 48;

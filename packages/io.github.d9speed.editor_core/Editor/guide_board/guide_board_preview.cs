@@ -10,12 +10,14 @@ namespace D9speed_BaseEditorUtils.GuideBoard
     internal sealed class guide_board_settings
     {
         public string text = "SETUP GUIDE\n\n説明文をここに入力します。";
+        public string font_name = string.Empty;
     }
 
     internal sealed class guide_board_preview : IDisposable
     {
         private const string package_path = "Packages/io.github.d9speed.editor_core";
         private static MethodInfo render_method;
+        private static MethodInfo font_list_method;
         private static FieldInfo png_field;
         private static FieldInfo overflow_field;
 
@@ -34,7 +36,7 @@ namespace D9speed_BaseEditorUtils.GuideBoard
             object result;
             try
             {
-                result = render_method.Invoke(null, new object[] { settings.text ?? string.Empty });
+                result = render_method.Invoke(null, new object[] { settings.text ?? string.Empty, settings.font_name });
             }
             catch (TargetInvocationException exception)
             {
@@ -78,6 +80,20 @@ namespace D9speed_BaseEditorUtils.GuideBoard
             return (byte[])png.Clone();
         }
 
+        public static string[] get_font_families()
+        {
+            ensure_renderer();
+            try
+            {
+                return (string[])font_list_method.Invoke(null, null);
+            }
+            catch (TargetInvocationException exception)
+            {
+                throw new InvalidOperationException("Windowsのフォント一覧を取得できませんでした: " + exception.InnerException?.Message,
+                    exception.InnerException ?? exception);
+            }
+        }
+
         private static void ensure_renderer()
         {
             if (render_method != null) return;
@@ -93,12 +109,15 @@ namespace D9speed_BaseEditorUtils.GuideBoard
             var assembly = Assembly.Load(File.ReadAllBytes(dll_path));
             var renderer_type = assembly.GetType("D9speed.GuideBoardRenderer.Renderer", true);
             var result_type = assembly.GetType("D9speed.GuideBoardRenderer.RenderedImage", true);
-            var method = renderer_type.GetMethod("RenderText", BindingFlags.Public | BindingFlags.Static);
+            var method = renderer_type.GetMethod("RenderText", BindingFlags.Public | BindingFlags.Static,
+                null, new[] { typeof(string), typeof(string) }, null);
+            var list_method = renderer_type.GetMethod("GetFontFamilies", BindingFlags.Public | BindingFlags.Static);
             var image_field = result_type.GetField("Png", BindingFlags.Public | BindingFlags.Instance);
             var clipped_field = result_type.GetField("Overflow", BindingFlags.Public | BindingFlags.Instance);
-            if (method == null || image_field == null || clipped_field == null)
+            if (method == null || list_method == null || image_field == null || clipped_field == null)
                 throw new MissingMemberException("説明画像の描画DLLがEditor Coreと互換性がありません。");
             render_method = method;
+            font_list_method = list_method;
             png_field = image_field;
             overflow_field = clipped_field;
         }

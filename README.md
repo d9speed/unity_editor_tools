@@ -1,5 +1,7 @@
 # D9speed Unity Editor Tools
 
+Editor Core 0.1.11では説明板のフォントをWindowsのインストール済み一覧から選べます。自動選択（メイリオ優先）も利用できます。[使い方](packages/io.github.d9speed.editor_core/README.md#説明画像つき板ポリプレハブ)を参照してください。
+
 Editor Core 0.1.10では説明板の描画をWindows用DLLに分離し、TextMeshProを不要にしました。Unity内では文章を入力し、プレビューを確認してPNGまたはEditorOnlyのプレハブを保存します。Windowsにメイリオがある場合は自動で使用します。
 
 Editor Core 0.1.9で、`D9speed/Tools/説明画像つき板ポリプレハブ作成(EditorOnly)` を追加しました。文章をPNGにし、UnlitマテリアルとEditorOnlyの板ポリゴンプレハブをまとめて保存できます。作成にはBuilt-in Render PipelineとTMPフォントが必要です。[使い方](packages/io.github.d9speed.editor_core/README.md#説明画像つき板ポリプレハブ)を参照してください。
