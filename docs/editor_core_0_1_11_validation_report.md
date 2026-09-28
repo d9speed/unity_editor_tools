@@ -17,4 +17,6 @@ DLL単体でも同じ英数字をArialとTimes New Romanで描画し、PNGの内
 - サイズ: 71,027 bytes
 - SHA-256: `c84d0657da65d7a40931a303664c724be4c056f6f21a291b1ce09ac1c6b57547`
 
+公開VPM一覧から0.1.11を取得し、認証なしでダウンロードしたGitHub ReleaseのZIPが上記SHA-256と一致することを確認しました。
+
 DLLはWindows用です。Unity画面での手操作、macOS、URP/HDRPの板ポリゴン表示、他言語のフォント表示は未検証です。
