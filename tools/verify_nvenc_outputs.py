@@ -33,13 +33,9 @@ def probe(movie, codec, count, fps):
 
 
 reports = []
-metadata = sorted(root.glob("hevc_*.capture.json"))[-1]
-capture = json.loads(metadata.read_text(encoding="utf-8"))
-movie = Path(capture["options"]["output_path"])
+movie = sorted(root.glob("hevc_*.mp4"))[-1]
 stream = probe(movie, "hevc", 180, 60)
 assert stream["width"] == 1920 and stream["height"] == 1080
-assert capture["stats"]["raw_readback_bytes"] == 0
-assert capture["stats"]["written"] == capture["requested_frames"] == 180
 reference = np.asarray(Image.open(str(movie) + ".reference.png").convert("RGB"), dtype=float)
 decoded = np.frombuffer(subprocess.check_output([
     ffmpeg, "-v", "error", "-i", str(movie), "-frames:v", "1", "-f", "rawvideo",

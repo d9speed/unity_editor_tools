@@ -50,10 +50,8 @@ namespace D9speed.Recording
                 if (!process.WaitForExit(120000))
                 {
                     process.Kill(); process.WaitForExit();
-                    File.WriteAllText(movie + ".png.log", args + "\n" + stderr.Result + "\nPNG export timeout (120 seconds)");
                     throw new TimeoutException("PNG出力が120秒で完了しませんでした。MOVは保存済みです。");
                 }
-                File.WriteAllText(movie + ".png.log", args + "\n" + stderr.Result);
                 if (process.ExitCode != 0) throw new IOException("PNG出力に失敗しました: " + stderr.Result);
                 return directory;
             });

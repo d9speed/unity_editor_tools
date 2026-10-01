@@ -14,12 +14,16 @@ namespace D9speed.NvencGpu
         public gpu_recorder_options options = new gpu_recorder_options();
         [Tooltip("ゲーム時間を録画FPSに固定します。実時間の録画ではオフにしてください。")]
         public bool offline_mode;
+        public int max_frames;
         public gpu_recorder_session session { get; private set; }
         public bool is_recording { get; private set; }
         public string last_error { get; private set; }
         public Task mux_task => session?.mux_task ?? Task.CompletedTask;
         Coroutine loop;
         RenderTexture camera_rt;
+        Camera camera_capture_source;
+        Camera fallback_camera;
+        CommandBuffer camera_capture_commands;
         int previous_capture;
         bool owns_capture_clock;
 
@@ -29,13 +33,20 @@ namespace D9speed.NvencGpu
             if (source_texture == null && target_camera == null) throw new InvalidOperationException("カメラまたはRenderTextureを指定してください。");
             if (source_texture == null && GraphicsSettings.currentRenderPipeline != null)
                 throw new NotSupportedException("URP/HDRPでは描画済みRenderTextureを指定してください。");
-            if (source_texture == null)
+            try
             {
-                camera_rt = new RenderTexture(options.width,options.height,24,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB)
-                    {name="nvenc_camera_target",hideFlags=HideFlags.HideAndDontSave};
-                camera_rt.Create();
+                if (source_texture == null)
+                {
+                    camera_capture_source = target_camera;
+                    camera_rt = new RenderTexture(options.width,options.height,24,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB)
+                        {name="nvenc_camera_target",hideFlags=HideFlags.HideAndDontSave};
+                    if (!camera_rt.Create()) throw new InvalidOperationException("録画用RenderTextureを作成できませんでした。");
+                    camera_capture_commands = new CommandBuffer { name = "d9_nvenc_camera_copy" };
+                    camera_capture_commands.Blit(BuiltinRenderTextureType.CameraTarget, camera_rt);
+                    camera_capture_source.AddCommandBuffer(CameraEvent.AfterEverything, camera_capture_commands);
+                }
+                session = new gpu_recorder_session(options);
             }
-            try { session = new gpu_recorder_session(options); }
             catch { release_camera(); throw; }
             previous_capture = Time.captureFramerate; owns_capture_clock = offline_mode;
             if (owns_capture_clock) Time.captureFramerate = options.fps;
@@ -56,13 +67,16 @@ namespace D9speed.NvencGpu
                     var source = source_texture;
                     if (source == null)
                     {
-                        if (target_camera == null) throw new InvalidOperationException("録画カメラが破棄されました。");
-                        var old_target = target_camera.targetTexture;
-                        try { target_camera.targetTexture = camera_rt; target_camera.Render(); }
-                        finally { if(target_camera != null) target_camera.targetTexture = old_target; }
+                        if (camera_capture_source == null) throw new InvalidOperationException("録画カメラが破棄されました。");
+                        if (!camera_capture_source.isActiveAndEnabled) render_fallback_camera();
                         source = camera_rt;
                     }
                     session.capture(source);
+                    if (max_frames > 0 && session.requested_frames >= max_frames)
+                    {
+                        stop();
+                        yield break;
+                    }
                 }
                 catch (Exception e) { last_error = e.Message; Debug.LogError("[NVENC GPU] " + last_error); is_recording = false; }
                 if (!is_recording) { stop(); yield break; }
@@ -82,10 +96,33 @@ namespace D9speed.NvencGpu
         }
         void release_camera()
         {
+            if (camera_capture_source != null && camera_capture_commands != null)
+                camera_capture_source.RemoveCommandBuffer(CameraEvent.AfterEverything, camera_capture_commands);
+            camera_capture_commands?.Release();
+            camera_capture_commands = null;
+            camera_capture_source = null;
+            if (fallback_camera != null)
+            {
+                if (Application.isPlaying) Destroy(fallback_camera.gameObject); else DestroyImmediate(fallback_camera.gameObject);
+                fallback_camera = null;
+            }
             if (camera_rt == null) return;
             camera_rt.Release();
             if (Application.isPlaying) Destroy(camera_rt); else DestroyImmediate(camera_rt);
             camera_rt = null;
+        }
+        void render_fallback_camera()
+        {
+            if (fallback_camera == null)
+            {
+                var fallback_object = new GameObject("d9_nvenc_fallback_camera") { hideFlags = HideFlags.HideAndDontSave };
+                fallback_camera = fallback_object.AddComponent<Camera>();
+            }
+            fallback_camera.CopyFrom(camera_capture_source);
+            fallback_camera.enabled = false;
+            fallback_camera.targetTexture = camera_rt;
+            fallback_camera.transform.SetPositionAndRotation(camera_capture_source.transform.position, camera_capture_source.transform.rotation);
+            fallback_camera.Render();
         }
         void OnDisable() { stop(); }
         void OnDestroy() { stop(); }

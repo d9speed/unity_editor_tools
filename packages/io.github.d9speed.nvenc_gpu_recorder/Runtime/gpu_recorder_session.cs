@@ -70,8 +70,6 @@ namespace D9speed.NvencGpu
         bool close_requested;
         gpu_recorder_stats final_stats;
         string failure = "";
-        readonly string unity_version, gpu_name;
-        readonly Stopwatch wall = Stopwatch.StartNew();
         public string raw_path { get; }
         public string output_path => options.output_path;
         public bool is_closed => id == 0;
@@ -101,7 +99,6 @@ namespace D9speed.NvencGpu
                 || settings.buffers < 4 || settings.buffers > 32)
                 throw new ArgumentException("解像度は16以上の偶数、FPSは1〜240、CQは0〜51、バッファは4〜32で指定してください。");
             options = JsonUtility.FromJson<gpu_recorder_options>(JsonUtility.ToJson(settings));
-            unity_version = Application.unityVersion; gpu_name = SystemInfo.graphicsDeviceName;
             options.output_path = Path.GetFullPath(options.output_path);
             options.ffmpeg_path = Path.GetFullPath(options.ffmpeg_path);
             if (!File.Exists(options.ffmpeg_path)) throw new FileNotFoundException("MP4格納用の ffmpeg.exe が見つかりません。",options.ffmpeg_path);
@@ -160,9 +157,6 @@ namespace D9speed.NvencGpu
                 pending_mux.RemoveAll(task => task.IsCompletedSuccessfully);
                 pending_mux.Add(mux_task);
             }
-            var report = new capture_report { unity=unity_version,gpu=gpu_name,options=options,stats=final_stats,
-                requested_frames=requested_frames,wall_seconds=wall.Elapsed.TotalSeconds,error=failure };
-            File.WriteAllText(Path.ChangeExtension(options.output_path,".capture.json"),JsonUtility.ToJson(report,true));
             return true;
         }
         public void stop()
@@ -185,14 +179,6 @@ namespace D9speed.NvencGpu
             staging = null;
         }
         public void Dispose() { stop(); }
-        [Serializable] sealed class capture_report
-        {
-            public string unity,gpu,error;
-            public gpu_recorder_options options;
-            public gpu_recorder_stats stats;
-            public long requested_frames;
-            public double wall_seconds;
-        }
         static string quote(string value)
         {
             if (value.IndexOf('"') >= 0 || value.IndexOf('\n') >= 0 || value.IndexOf('\r') >= 0)
@@ -214,7 +200,6 @@ namespace D9speed.NvencGpu
                 process.Start(); process.BeginErrorReadLine();
                 if (!process.WaitForExit(60000)) { process.Kill(); throw new TimeoutException("MP4格納がタイムアウトしました。HEVCファイルは保存されています。"); }
                 process.WaitForExit();
-                File.WriteAllText(Path.ChangeExtension(output,".mux.log"),args + Environment.NewLine + log);
                 if (process.ExitCode != 0) throw new IOException("MP4格納に失敗しました。HEVCファイルは保存されています。" + log);
             }
         }

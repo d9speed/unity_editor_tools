@@ -24,6 +24,7 @@ namespace D9speed.Recording
             public int width;
             public int height;
             public int fps;
+            public int max_frames;    // 0 = 手動停止
             public bool alpha;         // 背景を α0 の Solid Color でクリアして録画する
             public bool offline_mode;  // Time.captureFramerate 固定 + 同期読み戻し(取りこぼしゼロ・非リアルタイム)
             public bool force_ldr;     // 録画レンダリング時のみ HDR を無効化(アルファの安定用)
@@ -63,7 +64,6 @@ namespace D9speed.Recording
         bool capturing;
         bool use_source_texture;
         long final_frames;
-        string arguments;
 
         public void StartRecording(Config cfg, string ffmpeg_path, string ffmpeg_args, string output_path)
         {
@@ -80,7 +80,6 @@ namespace D9speed.Recording
             config = cfg;
             use_source_texture = cfg.source_texture != null;
             OutputPath = output_path;
-            arguments = ffmpeg_args;
             final_frames = FramesDropped = RawReadbackBytes = 0;
             PendingReadbacks = 0; LastError = ""; ExitCode = int.MinValue;
 
@@ -145,17 +144,6 @@ namespace D9speed.Recording
             if (code != 0) LastError = "FFmpeg exit=" + code + "\n" + stderr;
             if (!string.IsNullOrEmpty(LastError) && code == 0) code = -1;
             ExitCode = code;
-            try
-            {
-                File.WriteAllText(OutputPath + ".ffmpeg.log", arguments + "\n" + stderr);
-                File.WriteAllText(OutputPath + ".capture.json", JsonUtility.ToJson(new capture_report {
-                    unity = Application.unityVersion, gpu = SystemInfo.graphicsDeviceName,
-                    width = config.width, height = config.height, fps = config.fps, alpha = config.alpha,
-                    frames = final_frames, dropped = FramesDropped, raw_readback_bytes = RawReadbackBytes,
-                    exit_code = code, error = LastError, wall_seconds = Time.realtimeSinceStartup - StartRealtime
-                }, true));
-            }
-            catch (Exception e) { Debug.LogWarning("[ProRes] ログ保存: " + e.Message); }
             Finished?.Invoke(code, OutputPath, string.IsNullOrEmpty(LastError) ? stderr : LastError);
         }
 
@@ -190,10 +178,20 @@ namespace D9speed.Recording
                 }
 
                 double now = Time.realtimeSinceStartupAsDouble;
+                if (config.max_frames > 0 && FramesPushed >= config.max_frames)
+                {
+                    StopRecording();
+                    yield break;
+                }
                 if (!config.offline_mode && now < next) continue;
                 next = Math.Max(next + 1.0 / config.fps, now);
                 try { CaptureFrame(); }
                 catch (Exception e) { LastError = e.Message; StopRecording(); }
+                if (IsRecording && config.max_frames > 0 && FramesPushed >= config.max_frames)
+                {
+                    StopRecording();
+                    yield break;
+                }
             }
         }
 
@@ -201,6 +199,7 @@ namespace D9speed.Recording
         {
             if (!IsRecording) throw new InvalidOperationException("録画を開始してください。");
             if (session.Faulted) throw new IOException("FFmpegへの書き込みが中断しました。" + session.StderrTail);
+            if (config.max_frames > 0 && FramesPushed + PendingReadbacks >= config.max_frames) return;
             if (!config.offline_mode && PendingReadbacks + QueuedFrames >= config.max_queue) { FramesDropped++; return; }
             RenderToCaptureRt();
             if (config.offline_mode)
@@ -281,13 +280,5 @@ namespace D9speed.Recording
                 FramesDropped++; // リアルタイムモードでキュー満杯 → ドロップ
         }
 
-        [Serializable] sealed class capture_report
-        {
-            public string unity, gpu, error;
-            public int width, height, fps, exit_code;
-            public bool alpha;
-            public long frames, dropped, raw_readback_bytes;
-            public float wall_seconds;
-        }
     }
 }

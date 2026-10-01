@@ -10,6 +10,7 @@ namespace D9speed.NvencGpu.Editor
 {
     public sealed class gpu_recorder_window : EditorWindow
     {
+        enum capture_mode { manual, single_frame_png, seconds, frames }
         const string key = "d9_nvenc_gpu_";
         const string window_title = "FFmpeg Recorder";
         [SerializeField] Camera camera_source;
@@ -17,15 +18,21 @@ namespace D9speed.NvencGpu.Editor
         [SerializeField] gpu_recorder_options options = new gpu_recorder_options();
         [SerializeField] string output_directory, status = "", last_movie, last_ffmpeg, alpha_ffmpeg_path;
         [SerializeField] bool offline, with_alpha, export_png, last_premultiplied;
+        [SerializeField] bool png_alpha = true;
         [SerializeField] bool prefer_vulkan = true;
+        [SerializeField] capture_mode mode;
+        [SerializeField] float duration_seconds = 5f;
+        [SerializeField] int duration_frames = 300;
         gpu_camera_recorder recorder;
         AlphaCaptureRecorder alpha_recorder;
+        single_frame_png_capture png_capture;
+        int recording_max_frames;
         Task<prepared_prores> preparation;
         Task<string> png_task;
         Vector2 scroll;
         bool recording => recorder != null && recorder.is_recording || alpha_recorder != null && alpha_recorder.IsRecording;
         bool finishing => png_task != null && !png_task.IsCompleted || recorder != null && !recorder.mux_task.IsCompleted;
-        bool busy => recording || preparation != null || finishing;
+        bool busy => recording || png_capture != null || preparation != null || finishing;
         string current_ffmpeg { get => with_alpha ? alpha_ffmpeg_path : options.ffmpeg_path; set { if (with_alpha) alpha_ffmpeg_path = value; else options.ffmpeg_path = value; } }
 
         [MenuItem("D9speed/Recorder/FFmpeg Recorder")]
@@ -80,11 +87,19 @@ namespace D9speed.NvencGpu.Editor
             scroll = EditorGUILayout.BeginScrollView(scroll);
             EditorGUILayout.LabelField(window_title, EditorStyles.boldLabel);
             using (new EditorGUI.DisabledScope(busy))
-                with_alpha = EditorGUILayout.Popup("出力形式", with_alpha ? 1 : 0,
-                    new[] { "HEVC / MP4（アルファなし）", "ProRes 4444 / MOV（アルファ付き）" }) == 1;
-            EditorGUILayout.HelpBox(with_alpha
-                ? "透過背景をMOVに保存します。Vulkanが使えない場合はCPUへ切り替えます。画像はCPUへの読み戻しを経由します。音声なし。"
-                : "NVIDIA / D3D11専用。画像をGPU内でNVENCへ渡し、停止後にMP4へ格納します。アルファなし・音声なし。", MessageType.Info);
+                mode = (capture_mode)EditorGUILayout.Popup("録画モード", (int)mode,
+                    new[] { "手動停止", "シングルフレーム(png)", "指定秒数", "指定フレーム数" });
+            if (mode == capture_mode.single_frame_png)
+                EditorGUILayout.HelpBox("Playモードの次の描画フレームをPNGで保存します。FFmpegは不要です。", MessageType.Info);
+            else
+            {
+                using (new EditorGUI.DisabledScope(busy))
+                    with_alpha = EditorGUILayout.Popup("出力形式", with_alpha ? 1 : 0,
+                        new[] { "HEVC / MP4（アルファなし）", "ProRes 4444 / MOV（アルファ付き）" }) == 1;
+                EditorGUILayout.HelpBox(with_alpha
+                    ? "透過背景をMOVに保存します。Vulkanが使えない場合はCPUへ切り替えます。画像はCPUへの読み戻しを経由します。音声なし。"
+                    : "NVIDIA / D3D11専用。画像をGPU内でNVENCへ渡し、停止後にMP4へ格納します。アルファなし・音声なし。", MessageType.Info);
+            }
             EditorGUILayout.LabelField(SystemInfo.graphicsDeviceName);
             using (new EditorGUI.DisabledScope(busy))
             {
@@ -92,28 +107,42 @@ namespace D9speed.NvencGpu.Editor
                 if (texture_source == null) camera_source = (Camera)EditorGUILayout.ObjectField("カメラ (Built-in)", camera_source, typeof(Camera), true);
                 options.width = EditorGUILayout.IntField("幅", options.width);
                 options.height = EditorGUILayout.IntField("高さ", options.height);
-                options.fps = EditorGUILayout.IntField("FPS", options.fps);
-                if (with_alpha)
-                {
-                    prefer_vulkan = EditorGUILayout.Toggle("Vulkanを優先", prefer_vulkan);
-                    export_png = EditorGUILayout.Toggle("停止後に透過PNG連番も出力", export_png);
-                }
+                using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
+                    if (GUILayout.Button("キャプチャサイズをGame Viewに合わせる")) match_game_view_size();
+                if (mode == capture_mode.single_frame_png)
+                    png_alpha = EditorGUILayout.Toggle("透過背景", png_alpha);
                 else
                 {
-                    options.bitrate = Mathf.Max(0, EditorGUILayout.IntField("目標ビットレート (bps)", options.bitrate));
-                    options.cq = EditorGUILayout.IntSlider("CQ (0: ビットレート優先)", options.cq, 0, 51);
+                    options.fps = EditorGUILayout.IntField("FPS", options.fps);
+                    if (mode == capture_mode.seconds) duration_seconds = EditorGUILayout.FloatField("録画秒数", duration_seconds);
+                    if (mode == capture_mode.frames) duration_frames = EditorGUILayout.IntField("録画フレーム数", duration_frames);
+                    if (with_alpha)
+                    {
+                        prefer_vulkan = EditorGUILayout.Toggle("Vulkanを優先", prefer_vulkan);
+                        export_png = EditorGUILayout.Toggle("停止後に透過PNG連番も出力", export_png);
+                    }
+                    else
+                    {
+                        options.bitrate = Mathf.Max(0, EditorGUILayout.IntField("目標ビットレート (bps)", options.bitrate));
+                        options.cq = EditorGUILayout.IntSlider("CQ (0: ビットレート優先)", options.cq, 0, 51);
+                    }
                 }
                 options.flip_vertical = EditorGUILayout.Toggle("上下反転", options.flip_vertical);
-                offline = EditorGUILayout.Toggle("ゲーム時間をFPS固定", offline);
-                current_ffmpeg = EditorGUILayout.TextField("ffmpeg.exe", current_ffmpeg);
+                if (mode != capture_mode.single_frame_png)
+                {
+                    offline = EditorGUILayout.Toggle("ゲーム時間をFPS固定", offline);
+                    current_ffmpeg = EditorGUILayout.TextField("ffmpeg.exe", current_ffmpeg);
+                }
                 output_directory = EditorGUILayout.TextField("出力フォルダー", output_directory);
             }
             if (!EditorApplication.isPlaying) EditorGUILayout.HelpBox("Playモードで録画を開始してください。", MessageType.None);
-            if (with_alpha) EditorGUILayout.HelpBox("ProResは大容量です。VulkanのMOVはプリマルチプライド、CPUはストレートアルファ。PNG出力時にストレートへ変換します。", MessageType.None);
+            if (mode == capture_mode.seconds) EditorGUILayout.HelpBox("録画秒数 × FPSのフレーム数で自動停止します。", MessageType.None);
+            if (mode != capture_mode.single_frame_png && with_alpha) EditorGUILayout.HelpBox("ProResは大容量です。VulkanのMOVはプリマルチプライド、CPUはストレートアルファ。PNG出力時にストレートへ変換します。", MessageType.None);
             using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying || busy))
-                if (GUILayout.Button(preparation != null ? "ProResの動作を確認中…" : "録画開始")) EditorApplication.delayCall += start;
-            using (new EditorGUI.DisabledScope(!recording))
-                if (GUILayout.Button(with_alpha ? "停止してMOVを保存" : "停止してMP4を保存")) EditorApplication.delayCall += stop;
+                if (GUILayout.Button(mode == capture_mode.single_frame_png ? "PNGを保存" : "録画開始")) EditorApplication.delayCall += start;
+            if (mode != capture_mode.single_frame_png)
+                using (new EditorGUI.DisabledScope(!recording))
+                    if (GUILayout.Button(with_alpha ? "停止してMOVを保存" : "停止してMP4を保存")) EditorApplication.delayCall += stop;
             if (alpha_recorder != null)
             {
                 EditorGUILayout.LabelField("フレーム", $"送信 {alpha_recorder.FramesPushed} / ドロップ {alpha_recorder.FramesDropped}");
@@ -144,10 +173,25 @@ namespace D9speed.NvencGpu.Editor
             {
                 if (gpu_recorder_session.active_sessions != 0 || AlphaCaptureRecorder.ActiveSessions != 0)
                     throw new InvalidOperationException("他の録画を停止してから開始してください。");
-                if (options.width < 16 || options.height < 16 || options.width % 2 != 0 || options.height % 2 != 0 || options.fps < 1 || options.fps > 240)
-                    throw new ArgumentException("幅・高さは16以上の偶数、FPSは1～240を指定してください。");
                 if (texture_source == null && camera_source == null && Camera.main == null)
                     throw new ArgumentException("カメラまたはRenderTextureを指定してください。");
+                if (mode == capture_mode.single_frame_png)
+                {
+                    if (options.width < 1 || options.height < 1) throw new ArgumentException("PNGの幅・高さは1以上にしてください。");
+                    clear_recorders();
+                    png_capture = create_recorder<single_frame_png_capture>();
+                    png_capture.target_camera = source_camera; png_capture.source_texture = texture_source;
+                    png_capture.width = options.width; png_capture.height = options.height;
+                    png_capture.alpha = png_alpha; png_capture.flip_vertical = options.flip_vertical;
+                    png_capture.output_path = make_output("frame_", ".png");
+                    png_capture.finished += on_png_finished;
+                    png_capture.begin(); status = "次の描画フレームをPNGに保存中…";
+                    Repaint();
+                    return;
+                }
+                if (options.width < 16 || options.height < 16 || options.width % 2 != 0 || options.height % 2 != 0 || options.fps < 1 || options.fps > 240)
+                    throw new ArgumentException("幅・高さは16以上の偶数、FPSは1～240を指定してください。");
+                recording_max_frames = frame_limit();
                 if (!File.Exists(current_ffmpeg)) throw new FileNotFoundException("ffmpeg.exeを指定してください。");
                 clear_recorders();
                 EditorPrefs.SetString(key+"ffmpeg", options.ffmpeg_path);
@@ -165,7 +209,7 @@ namespace D9speed.NvencGpu.Editor
                     options.output_path = make_output("gpu_", ".mp4");
                     recorder = create_recorder<gpu_camera_recorder>();
                     recorder.target_camera = source_camera; recorder.source_texture = texture_source;
-                    recorder.options = options; recorder.offline_mode = offline;
+                    recorder.options = options; recorder.offline_mode = offline; recorder.max_frames = recording_max_frames;
                     recorder.begin(); status = "録画中: HEVC / GPU直接入力";
                 }
             }
@@ -187,6 +231,38 @@ namespace D9speed.NvencGpu.Editor
         Camera source_camera => camera_source != null ? camera_source : Camera.main;
         string make_output(string prefix, string suffix) => Path.Combine(Path.GetFullPath(output_directory), prefix + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + suffix);
         static T create_recorder<T>() where T : Component => new GameObject("d9_capture") { hideFlags = HideFlags.DontSave }.AddComponent<T>();
+        int frame_limit()
+        {
+            if (mode == capture_mode.manual) return 0;
+            if (mode == capture_mode.frames)
+            {
+                if (duration_frames < 1) throw new ArgumentException("録画フレーム数は1以上にしてください。");
+                return duration_frames;
+            }
+            if (float.IsNaN(duration_seconds) || float.IsInfinity(duration_seconds) || duration_seconds <= 0)
+                throw new ArgumentException("録画秒数は0より大きくしてください。");
+            double frames = Math.Ceiling((double)duration_seconds * options.fps);
+            if (frames > int.MaxValue) throw new ArgumentException("録画秒数が長すぎます。");
+            return Math.Max(1, (int)frames);
+        }
+        void match_game_view_size()
+        {
+            int game_width = Screen.width, game_height = Screen.height;
+            int width = game_width, height = game_height;
+            if (mode != capture_mode.single_frame_png) { width &= ~1; height &= ~1; }
+            int minimum = mode == capture_mode.single_frame_png ? 1 : 16;
+            if (width < minimum || height < minimum) { status = "Game Viewのサイズが録画可能な範囲より小さいです。"; return; }
+            options.width = width; options.height = height;
+            status = width == game_width && height == game_height
+                ? $"キャプチャサイズをGame Viewに合わせました: {width}×{height}"
+                : $"Game Viewのサイズを録画可能な偶数へ調整しました: {width}×{height}";
+        }
+        void on_png_finished(string path, Exception error)
+        {
+            png_capture = null;
+            status = error == null ? "PNG保存完了: " + path : "PNG保存に失敗しました: " + error.Message;
+            Repaint();
+        }
         void begin_alpha(prepared_prores prepared)
         {
             try
@@ -196,15 +272,14 @@ namespace D9speed.NvencGpu.Editor
                 alpha_recorder.Finished += on_alpha_finished;
                 alpha_recorder.StartRecording(new AlphaCaptureRecorder.Config {
                     target_camera = source_camera, source_texture = texture_source, width = options.width, height = options.height,
-                    fps = options.fps, alpha = true, offline_mode = offline, force_ldr = true, flip_vertical = options.flip_vertical, max_queue = 8
+                    fps = options.fps, max_frames = recording_max_frames, alpha = true, offline_mode = offline,
+                    force_ldr = true, flip_vertical = options.flip_vertical, max_queue = 8
                 }, prepared.executable, prores_encoding.arguments(options.width, options.height, options.fps, prepared.vulkan, last_movie), last_movie);
-                File.WriteAllText(last_movie + ".format.json", JsonUtility.ToJson(new alpha_format { encoder = prepared.vulkan ? "prores_ks_vulkan" : "prores_ks", premultiplied = prepared.vulkan, ffmpeg = prepared.executable }, true));
                 status = "録画中: ProRes 4444 / " + prepared.note;
             }
             catch (Exception e) { clear_recorders(); fail(e); }
             Repaint();
         }
-        [Serializable] sealed class alpha_format { public string encoder, ffmpeg; public bool premultiplied; }
         void on_alpha_finished(int code, string path, string stderr)
         {
             status = code == 0 ? "MOV保存完了: " + path : "ProRes録画に失敗しました: " + stderr;
@@ -221,6 +296,13 @@ namespace D9speed.NvencGpu.Editor
             preparation = null;
             try
             {
+                if (png_capture != null)
+                {
+                    png_capture.finished -= on_png_finished;
+                    png_capture.StopAllCoroutines();
+                    Destroy(png_capture.gameObject);
+                    png_capture = null;
+                }
                 if (recorder != null && recorder.is_recording) { recorder.stop(); status = "MP4に格納中: " + recorder.options.output_path; }
                 if (alpha_recorder != null && alpha_recorder.IsRecording) alpha_recorder.StopRecording();
             }

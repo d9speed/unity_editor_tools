@@ -58,7 +58,7 @@ namespace D9speed.PackageValidation
         {
             var package = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
                 .Single(p => p.name == "io.github.d9speed.nvenc_gpu_recorder");
-            require(package.version == "0.1.0", "Package version");
+            require(package.version == "0.1.2", "Package version");
             require(!Directory.GetFiles(package.resolvedPath, "*.exe", SearchOption.AllDirectories).Any(), "Bundled executable");
             require(!Directory.Exists(Path.Combine(package.resolvedPath, "results~")), "Bundled recording results");
             var dll = Directory.GetFiles(Path.Combine(package.resolvedPath, "Plugins/x86_64"), "*.dll").Single();
