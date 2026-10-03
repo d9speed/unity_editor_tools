@@ -29,6 +29,7 @@ public class SkinnedMeshRendererEditorExtra : Editor
     private const string BoundsColorSessionKey = nameof(SkinnedMeshRendererEditorExtra) + ".bounds_color";
     private Color blend_shape_bounds_color = Color.cyan;
     private readonly Dictionary<int, Bounds> blend_shape_delta_bounds = new Dictionary<int, Bounds>();
+    private readonly Dictionary<int, Slider> unstored_blend_shape_sliders = new Dictionary<int, Slider>();
     private long cached_mesh_instance_id;
     private int active_blend_shape_bounds_index = -1;
     private static readonly Regex blend_shape_group_header_regex = new Regex(
@@ -264,6 +265,31 @@ public class SkinnedMeshRendererEditorExtra : Editor
         
         // 初期BlendShape表示
         UpdateBlendShapesUI(blendShapesContainer);
+
+        var displayed_mesh = ((SkinnedMeshRenderer)target).sharedMesh;
+        int displayed_weight_count = serializedObject.FindProperty("m_BlendShapeWeights").arraySize;
+        root.TrackSerializedObjectValue(serializedObject, tracked_object =>
+        {
+            var current_mesh = ((SkinnedMeshRenderer)target).sharedMesh;
+            int current_weight_count = tracked_object.FindProperty("m_BlendShapeWeights").arraySize;
+            if (current_mesh == displayed_mesh && current_weight_count == displayed_weight_count)
+            {
+                // 編集直後のUndoで配列長が元に戻った場合も、未バインド行の表示値を同期する。
+                var smr = (SkinnedMeshRenderer)target;
+                foreach (var entry in unstored_blend_shape_sliders)
+                {
+                    float current_weight = smr.GetBlendShapeWeight(entry.Key);
+                    entry.Value.SetValueWithoutNotify(current_weight);
+                    UpdateBlendShapeRowVisibility(entry.Value.parent, current_weight);
+                }
+                return;
+            }
+
+            // 初回編集やUndoで保存配列の長さが変わったら、各行のバインドを作り直す。
+            displayed_mesh = current_mesh;
+            displayed_weight_count = current_weight_count;
+            UpdateBlendShapesUI(blendShapesContainer);
+        });
         
         // アニメーション保存ボタン
         var saveAnimButton = new Button(() => {
@@ -395,6 +421,8 @@ public class SkinnedMeshRendererEditorExtra : Editor
 
     private void UpdateBlendShapesUI(VisualElement container)
     {
+        serializedObject.UpdateIfRequiredOrScript();
+        unstored_blend_shape_sliders.Clear();
         container.Clear();
         var smr = (SkinnedMeshRenderer)target;
         var mesh = smr.sharedMesh;
@@ -446,23 +474,33 @@ public class SkinnedMeshRendererEditorExtra : Editor
 
 
 
-                if (!TryGetBlendShapeWeightProperty(i, out var weightProperty))
-                    continue;
+                bool has_weight_property = TryGetBlendShapeWeightProperty(i, out var weightProperty);
 
                 var slider = CreateBlendShapeSlider(weightProperty, weight);
                 UpdateBlendShapeRowVisibility(row, weight);
                 int blendShapeIndex = i;
-                slider.RegisterValueChangedCallback(_ =>
+                if (!has_weight_property)
+                    unstored_blend_shape_sliders[blendShapeIndex] = slider;
+                slider.RegisterValueChangedCallback(evt =>
                 {
+                    if (!has_weight_property)
+                    {
+                        set_unstored_blend_shape_weight(blendShapeIndex, evt.newValue);
+                        UpdateBlendShapeRowVisibility(row, evt.newValue);
+                    }
+
                     if (show_blend_shape_bounds)
                     {
                         ShowBlendShapeBounds(blendShapeIndex);
                     }
                 });
-                row.TrackPropertyValue(weightProperty, trackedProperty =>
+                if (has_weight_property)
                 {
-                    UpdateBlendShapeRowVisibility(row, trackedProperty.floatValue);
-                });
+                    row.TrackPropertyValue(weightProperty, trackedProperty =>
+                    {
+                        UpdateBlendShapeRowVisibility(row, trackedProperty.floatValue);
+                    });
+                }
 
 
 
@@ -607,9 +645,33 @@ public class SkinnedMeshRendererEditorExtra : Editor
         slider.value = weight;
         slider.showInputField = true;
         slider.style.flexGrow = 1;
-        slider.BindProperty(weightProperty);
+        if (weightProperty != null)
+            slider.BindProperty(weightProperty);
 
         return slider;
+    }
+
+    private void set_unstored_blend_shape_weight(int blend_shape_index, float value)
+    {
+        var smr = (SkinnedMeshRenderer)target;
+        var mesh = smr.sharedMesh;
+        if (mesh == null || blend_shape_index < 0 || blend_shape_index >= mesh.blendShapeCount)
+            return;
+
+        serializedObject.Update();
+        var weights = serializedObject.FindProperty("m_BlendShapeWeights");
+        int previous_count = weights.arraySize;
+        if (previous_count <= blend_shape_index)
+        {
+            // Unityは未編集のウェイトを保存しない場合がある。閲覧時は変更せず、編集時だけ補う。
+            weights.arraySize = mesh.blendShapeCount;
+            for (int i = previous_count; i < weights.arraySize; i++)
+                weights.GetArrayElementAtIndex(i).floatValue = 0f;
+        }
+
+        weights.GetArrayElementAtIndex(blend_shape_index).floatValue = value;
+        // 標準Inspectorと同じSerializedProperty経由でUndo・Prefab override・録画へ反映する。
+        serializedObject.ApplyModifiedProperties();
     }
 
     private void ShowBlendShapeBounds(int blendShapeIndex)

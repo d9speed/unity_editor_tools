@@ -6,6 +6,8 @@ SkinnedMeshRendererのInspectorに、BlendShapeの検索・操作、AnimationCli
 
 導入後、SkinnedMeshRendererを持つオブジェクトを選択すると拡張Inspectorが表示されます。専用のメニューウィンドウはありません。BlendShapeのリセット、現在値のAnimationClip保存、AnimationClipの先頭フレームの適用ができます。元のInspectorも表示します。
 
+0.1.1では、未編集のBlendShapeの保存値がないモデルでも、分類内のスライダーを0として表示します。Inspectorを開くだけでは値を保存せず、初めてスライダーを編集したときに必要な保存領域を補います。
+
 Unity 2022.3.22f1、Editor専用。VRChat SDKは不要です。同じSkinnedMeshRenderer用のカスタムInspectorを提供する別ツールとは表示が競合する場合があります。旧Assets版との同時導入は避けてください。
 
 MIT License。連絡先: d09pseed@gmail.com
