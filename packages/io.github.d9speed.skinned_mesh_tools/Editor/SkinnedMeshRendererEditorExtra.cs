@@ -36,42 +36,19 @@ public class SkinnedMeshRendererEditorExtra : Editor
         @"^\s*(?<separator>[^\p{L}\p{N}\s])\k<separator>{2,}\s*(?<group_name>.*?)\s*\k<separator>{2,}\s*$",
         RegexOptions.Compiled);
 
-    [System.Serializable]
-    private class BlendShapeGroupFoldoutStateEntry
+    private const string all_blend_shape_groups = "__all__";
+    private string selected_blend_shape_group;
+    private VisualElement blend_shape_tab_bar;
+    private ScrollView blend_shape_tab_scroll;
+    private Button previous_blend_shape_tab;
+    private Button next_blend_shape_tab;
+    private readonly Dictionary<string, ToolbarToggle> blend_shape_tab_buttons = new Dictionary<string, ToolbarToggle>();
+
+    private class blend_shape_group
     {
         public string key;
-        public bool is_expanded;
-    }
-
-    [FilePath("ProjectSettings/SkinnedMeshRendererEditorExtraState.asset", FilePathAttribute.Location.ProjectFolder)]
-    private class BlendShapeEditorState : ScriptableSingleton<BlendShapeEditorState>
-    {
-        [SerializeField] private List<BlendShapeGroupFoldoutStateEntry> blend_shape_group_foldout_states = new List<BlendShapeGroupFoldoutStateEntry>();
-
-        public bool GetGroupFoldoutState(string key, bool default_value)
-        {
-            var entry = blend_shape_group_foldout_states.FirstOrDefault(x => x.key == key);
-            return entry != null ? entry.is_expanded : default_value;
-        }
-
-        public void SetGroupFoldoutState(string key, bool is_expanded)
-        {
-            var entry = blend_shape_group_foldout_states.FirstOrDefault(x => x.key == key);
-            if (entry == null)
-            {
-                blend_shape_group_foldout_states.Add(new BlendShapeGroupFoldoutStateEntry
-                {
-                    key = key,
-                    is_expanded = is_expanded
-                });
-            }
-            else
-            {
-                entry.is_expanded = is_expanded;
-            }
-
-            Save(true);
-        }
+        public string title;
+        public readonly List<int> indices = new List<int>();
     }
 
     //折りたたみ記録
@@ -101,6 +78,7 @@ public class SkinnedMeshRendererEditorExtra : Editor
 
         // SessionSate用キー
         _SMRObjKey = GetObjectKey(target);
+        selected_blend_shape_group = SessionState.GetString(get_selected_group_key(), string.Empty);
         show_blend_shape_bounds = SessionState.GetBool(ShowBlendShapeBoundsSessionKey, false);
         blend_shape_bounds_color = ParseColor(SessionState.GetString(BoundsColorSessionKey, ColorUtility.ToHtmlStringRGBA(Color.cyan)), Color.cyan);
 
@@ -197,6 +175,8 @@ public class SkinnedMeshRendererEditorExtra : Editor
 
         blendShapesFoldout.RegisterValueChangedCallback(evt =>
         {
+            if (evt.target != blendShapesFoldout)
+                return;
             SessionState.SetBool($"{nameof(SkinnedMeshRendererEditorExtra)}{nameof(_customInpectorFoldOutKey)}" + _SMRObjKey, evt.newValue);
         });
 
@@ -210,7 +190,7 @@ public class SkinnedMeshRendererEditorExtra : Editor
 
 
         // Create the blend shapes container first
-        var blendShapesContainer = new VisualElement();
+        var blendShapesContainer = new VisualElement { name = "blend_shape_rows" };
         blendShapesContainer.style.marginTop = 5;
         blendShapesContainer.style.marginBottom = 10;
 
@@ -236,6 +216,7 @@ public class SkinnedMeshRendererEditorExtra : Editor
 
         // search
         var searchField = new TextField("Search");
+        searchField.tooltip = "選択中のグループを検索します。「すべて」タブでは全グループを検索します。";
         searchField.value = blendShapeSearch;
         searchField.style.flexGrow = 1;
         searchField.style.marginRight = 5;
@@ -260,6 +241,7 @@ public class SkinnedMeshRendererEditorExtra : Editor
         resetAllButtonUpper.style.display = DisplayStyle.Flex;
         blendShapesFoldout.Add(resetAllButtonUpper);
 
+        blendShapesFoldout.Add(create_blend_shape_tab_bar());
         blendShapesFoldout.Add(blendShapesContainer);
 
         
@@ -430,30 +412,17 @@ public class SkinnedMeshRendererEditorExtra : Editor
         if (mesh != null && mesh.blendShapeCount > 0)
         {
             string low = blendShapeSearch.ToLower();
-            bool use_group_foldout = string.IsNullOrEmpty(low);
-            string current_group_name = null;
-            string current_group_state_key = null;
-            Foldout current_group_foldout = null;
-            for (int i = 0; i < mesh.blendShapeCount; i++)
+            var groups = get_blend_shape_groups(mesh);
+            update_blend_shape_tabs(groups, container);
+            var visible_indices = groups
+                .Where(group => selected_blend_shape_group == all_blend_shape_groups || group.key == selected_blend_shape_group)
+                .SelectMany(group => group.indices);
+            foreach (int i in visible_indices)
             {
                 string name = mesh.GetBlendShapeName(i);
-                if (use_group_foldout && TryParseBlendShapeGroupHeader(name, out var group_name))
-                {
-                    current_group_name = group_name;
-                    current_group_state_key = BuildBlendShapeGroupStateKey(name);
-                    current_group_foldout = null;
-                    continue;
-                }
-
                 float weight = smr.GetBlendShapeWeight(i);
                 if (!IsBlendShapeVisible(name, weight, low))
                     continue;
-
-                if (use_group_foldout && current_group_name != null && current_group_foldout == null)
-                {
-                    current_group_foldout = CreateBlendShapeGroupFoldout(current_group_name, current_group_state_key);
-                    container.Add(current_group_foldout);
-                }
 
                 // Create a row for each blend shape
                 var row = new VisualElement();
@@ -544,17 +513,16 @@ public class SkinnedMeshRendererEditorExtra : Editor
                 row.Add(label);
                 row.Add(slider);
 
-                if (use_group_foldout && current_group_foldout != null)
-                {
-                    current_group_foldout.Add(row);
-                    continue;
-                }
-
                 container.Add(row);
             }
+
+            if (container.childCount == 0)
+                container.Add(new HelpBox("条件に一致するBlendShapeはありません。", HelpBoxMessageType.Info));
         }
         else
         {
+            if (blend_shape_tab_bar != null)
+                blend_shape_tab_bar.style.display = DisplayStyle.None;
             var helpBox = new HelpBox("No blend shapes found.", HelpBoxMessageType.Info);
             //helpBox.style.padding = 10;
             helpBox.style.backgroundColor = new Color(0, 0, 0, 0.1f);
@@ -591,27 +559,151 @@ public class SkinnedMeshRendererEditorExtra : Editor
         return !string.IsNullOrEmpty(group_name);
     }
 
-    private string BuildBlendShapeGroupStateKey(string raw_group_header_name)
+    private string get_selected_group_key()
     {
-        return $"{_SMRObjKey}:blend_shape_group:{raw_group_header_name}";
+        return $"{nameof(SkinnedMeshRendererEditorExtra)}:selected_blend_shape_group:{_SMRObjKey}";
     }
 
-    private Foldout CreateBlendShapeGroupFoldout(string group_name, string state_key)
+    private List<blend_shape_group> get_blend_shape_groups(Mesh mesh)
     {
-        var foldout = new Foldout
+        var groups = new List<blend_shape_group>();
+        var current = new blend_shape_group { key = "ungrouped", title = "その他" };
+        groups.Add(current);
+        for (int i = 0; i < mesh.blendShapeCount; i++)
         {
-            text = group_name,
-            value = BlendShapeEditorState.instance.GetGroupFoldoutState(state_key, false)
-        };
-        foldout.style.marginTop = 4;
-        foldout.style.marginBottom = 2;
-        foldout.style.marginLeft = 6;
-        foldout.RegisterValueChangedCallback(evt =>
-        {
-            BlendShapeEditorState.instance.SetGroupFoldoutState(state_key, evt.newValue);
-        });
+            string name = mesh.GetBlendShapeName(i);
+            if (TryParseBlendShapeGroupHeader(name, out var group_name))
+            {
+                current = new blend_shape_group { key = name + ":" + i, title = group_name };
+                groups.Add(current);
+            }
+            else
+            {
+                current.indices.Add(i);
+            }
+        }
 
-        return foldout;
+        if (groups[0].indices.Any(i => mesh.GetBlendShapeName(i).StartsWith("vrc.v_", StringComparison.OrdinalIgnoreCase)))
+            groups[0].title = "リップシンク";
+        return groups.Where(group => group.indices.Count > 0).ToList();
+    }
+
+    private VisualElement create_blend_shape_tab_bar()
+    {
+        blend_shape_tab_buttons.Clear();
+        blend_shape_tab_bar = new VisualElement { name = "blend_shape_tab_bar" };
+        blend_shape_tab_bar.style.flexDirection = FlexDirection.Row;
+        blend_shape_tab_bar.style.marginBottom = 4;
+        blend_shape_tab_bar.style.minWidth = 0;
+        blend_shape_tab_bar.style.flexShrink = 0;
+
+        previous_blend_shape_tab = new ToolbarButton(() => scroll_blend_shape_tabs(-1))
+            { name = "blend_shape_tabs_previous", text = "‹", tooltip = "タブを左へスクロール" };
+        next_blend_shape_tab = new ToolbarButton(() => scroll_blend_shape_tabs(1))
+            { name = "blend_shape_tabs_next", text = "›", tooltip = "タブを右へスクロール" };
+        foreach (var arrow in new[] { previous_blend_shape_tab, next_blend_shape_tab })
+        {
+            arrow.style.width = 22;
+            arrow.style.height = EditorGUIUtility.singleLineHeight + 2;
+            arrow.style.flexShrink = 0;
+        }
+
+        blend_shape_tab_scroll = new ScrollView(ScrollViewMode.Horizontal)
+        {
+            name = "blend_shape_tab_scroll",
+            horizontalScrollerVisibility = ScrollerVisibility.Auto,
+            verticalScrollerVisibility = ScrollerVisibility.Hidden,
+            mouseWheelScrollSize = 60,
+            tooltip = "左右のボタン・横スクロールバー・ホイールでタブを移動できます。"
+        };
+        blend_shape_tab_scroll.style.flexGrow = 1;
+        blend_shape_tab_scroll.style.flexShrink = 1;
+        blend_shape_tab_scroll.style.minWidth = 0;
+        blend_shape_tab_scroll.style.height = EditorGUIUtility.singleLineHeight + 18;
+        blend_shape_tab_scroll.contentContainer.style.flexDirection = FlexDirection.Row;
+        blend_shape_tab_scroll.contentContainer.style.flexWrap = Wrap.NoWrap;
+        blend_shape_tab_scroll.contentContainer.RegisterCallback<GeometryChangedEvent>(_ => update_tab_scroll_buttons());
+        blend_shape_tab_scroll.contentViewport.RegisterCallback<GeometryChangedEvent>(_ => update_tab_scroll_buttons());
+        blend_shape_tab_scroll.horizontalScroller.valueChanged += _ => update_tab_scroll_buttons();
+
+        blend_shape_tab_bar.Add(previous_blend_shape_tab);
+        blend_shape_tab_bar.Add(blend_shape_tab_scroll);
+        blend_shape_tab_bar.Add(next_blend_shape_tab);
+        return blend_shape_tab_bar;
+    }
+
+    private void update_blend_shape_tabs(List<blend_shape_group> groups, VisualElement rows)
+    {
+        if (selected_blend_shape_group != all_blend_shape_groups && !groups.Any(group => group.key == selected_blend_shape_group))
+            selected_blend_shape_group = groups.Count > 0 ? groups[0].key : all_blend_shape_groups;
+
+        blend_shape_tab_bar.style.display = groups.Count > 1 ? DisplayStyle.Flex : DisplayStyle.None;
+        bool rebuild = blend_shape_tab_buttons.Count != groups.Count + 1 ||
+            groups.Any(group => !blend_shape_tab_buttons.TryGetValue(group.key, out var button) || button.text != group.title);
+        if (rebuild)
+        {
+            blend_shape_tab_scroll.Clear();
+            blend_shape_tab_buttons.Clear();
+            add_blend_shape_tab(all_blend_shape_groups, "すべて", rows);
+            foreach (var group in groups)
+                add_blend_shape_tab(group.key, group.title, rows);
+        }
+
+        foreach (var entry in blend_shape_tab_buttons)
+        {
+            bool selected = entry.Key == selected_blend_shape_group;
+            entry.Value.EnableInClassList("blend_shape_tab_selected", selected);
+            entry.Value.SetValueWithoutNotify(selected);
+        }
+
+        if (rebuild && blend_shape_tab_buttons.TryGetValue(selected_blend_shape_group, out var selected_button))
+        {
+            var scroll_view = blend_shape_tab_scroll;
+            scroll_view.schedule.Execute(() =>
+            {
+                if (selected_button.parent == scroll_view.contentContainer)
+                    scroll_view.ScrollTo(selected_button);
+            });
+        }
+    }
+
+    private void add_blend_shape_tab(string key, string title, VisualElement rows)
+    {
+        var button = new ToolbarToggle { text = title, tooltip = title, userData = key };
+        button.RegisterValueChangedCallback(evt =>
+        {
+            evt.StopPropagation();
+            if (!evt.newValue)
+            {
+                button.SetValueWithoutNotify(true);
+                return;
+            }
+            selected_blend_shape_group = key;
+            SessionState.SetString(get_selected_group_key(), key);
+            UpdateBlendShapesUI(rows);
+        });
+        button.name = key == all_blend_shape_groups ? "blend_shape_tab_all" : "blend_shape_tab_" + blend_shape_tab_buttons.Count;
+        button.AddToClassList("blend_shape_tab");
+        button.style.flexShrink = 0;
+        button.style.whiteSpace = WhiteSpace.NoWrap;
+        blend_shape_tab_buttons.Add(key, button);
+        blend_shape_tab_scroll.Add(button);
+    }
+
+    private void scroll_blend_shape_tabs(int direction)
+    {
+        float distance = Mathf.Max(120f, blend_shape_tab_scroll.contentViewport.layout.width * 0.75f);
+        float limit = Mathf.Max(0f, blend_shape_tab_scroll.horizontalScroller.highValue);
+        float offset = Mathf.Clamp(blend_shape_tab_scroll.scrollOffset.x + direction * distance, 0f, limit);
+        blend_shape_tab_scroll.scrollOffset = new Vector2(offset, 0f);
+    }
+
+    private void update_tab_scroll_buttons()
+    {
+        float offset = blend_shape_tab_scroll.scrollOffset.x;
+        float limit = Mathf.Max(0f, blend_shape_tab_scroll.horizontalScroller.highValue);
+        previous_blend_shape_tab.SetEnabled(offset > 0.5f);
+        next_blend_shape_tab.SetEnabled(offset < limit - 0.5f);
     }
 
     private static string GetBlendShapeWeightPropertyPath(int blendShapeIndex)

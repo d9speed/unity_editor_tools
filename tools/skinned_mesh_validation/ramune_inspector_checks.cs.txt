@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEditor.SceneManagement;
 using UnityEngine.UIElements;
 if(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/EMOLab Avatars/Ramune/Base/Fbx/Ramune_Base.fbx")==null) return "Ramune_Base.fbx is required for this regression check";
@@ -19,6 +20,8 @@ instance.name="ramune_validation_instance";
 var renderer=instance.GetComponentsInChildren<SkinnedMeshRenderer>(true).First(r=>r.sharedMesh.blendShapeCount==737);
 editor=Editor.CreateEditor(renderer);
 var root=editor.CreateInspectorGUI();test_root=root;
+foreach(var child in root.Children()) child.style.display=child is Foldout fold && fold.text=="BlendShapes" ? DisplayStyle.Flex : DisplayStyle.None;
+root.Query<Foldout>().ToList().First(f=>f.text=="BlendShapes").SetValueWithoutNotify(true);
 root.style.position=Position.Absolute;root.style.left=0;root.style.top=0;root.style.right=0;root.style.bottom=0;
 root.style.backgroundColor=new Color(0.18f,0.18f,0.18f);
 window.rootVisualElement.Add(root);
@@ -27,11 +30,13 @@ Func<string,Slider> slider_for=name=>root.Query<Label>().ToList().First(l=>l.too
 Func<int> weight_count=()=>{using(var so=new SerializedObject(renderer))return so.FindProperty("m_BlendShapeWeights").arraySize;};
 Action<bool,string> check=(condition,message)=>{if(!condition)throw new Exception(message);results.Add("PASS "+message);};
 
+await Task.Delay(200);
+root.Q<ToolbarToggle>("blend_shape_tab_all").value=true;
 for(int step=0;step<8;step++) {
  await Task.Delay(450);
 switch(step) {
    case 0:
-    check(root.Query<Slider>().ToList().Count==720,"Ramune: 720 sliders");
+    check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==720,"Ramune: 720 sliders");
     check(weight_count()==0,"Viewing leaves empty weights unchanged");
     Undo.IncrementCurrentGroup();Undo.SetCurrentGroupName("BlendShape validation first edit");
     slider_for("eye_blink").value=64f;Undo.FlushUndoRecordObjects();
@@ -54,22 +59,22 @@ switch(step) {
     check(weight_count()==0,"Undo first edit restores empty weights");
     break;
    case 3:
-    check(root.Query<Slider>().ToList().Count==720 && slider_for("eye_blink").value==0f && slider_for("eye_blink").enabledInHierarchy,"Empty-array Undo keeps all sliders usable");
+    check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==720 && slider_for("eye_blink").value==0f && slider_for("eye_blink").enabledInHierarchy,"Empty-array Undo keeps all sliders usable");
     Undo.PerformRedo();check(weight_count()==737 && renderer.GetBlendShapeWeight(145)==64f,"Redo first edit restores 64");
     break;
    case 4:
     check(slider_for("eye_blink").value==64f,"UI follows first-edit Redo");
     var nonzero=root.Query<Toggle>().ToList().First(t=>t.label=="0より大きいものだけ表示");
-    nonzero.value=true;check(root.Query<Slider>().ToList().Count==1,"Nonzero filter shows only edited shape");
+    nonzero.value=true;check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==1,"Nonzero filter shows only edited shape");
     nonzero.value=false;
     var search=root.Query<TextField>().ToList().First(f=>f.label=="Search");
-    search.value="pupil_up";check(root.Query<Slider>().ToList().Count==1,"Search returns exact unique shape");
-    search.value="missing_shape_test";check(root.Query<Slider>().ToList().Count==0,"Unmatched search is empty");
-    search.value="";check(root.Query<Slider>().ToList().Count==720,"Clearing search restores all rows");
+    search.value="pupil_up";check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==1,"Search returns exact unique shape");
+    search.value="missing_shape_test";check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==0,"Unmatched search is empty");
+    search.value="";check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==720,"Clearing search restores all rows");
     using(var so=new SerializedObject(renderer)) {var weights=so.FindProperty("m_BlendShapeWeights");weights.arraySize=2;weights.GetArrayElementAtIndex(0).floatValue=12f;weights.GetArrayElementAtIndex(1).floatValue=37f;so.ApplyModifiedPropertiesWithoutUndo();}
     break;
    case 5:
-    check(root.Query<Slider>().ToList().Count==720 && weight_count()==2,"Short array displays all rows without expansion");
+    check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==720 && weight_count()==2,"Short array displays all rows without expansion");
     check(slider_for("blink").value==12f && slider_for("vrc.v_sil").value==37f,"Existing partial-array values remain visible");
     Undo.IncrementCurrentGroup();Undo.SetCurrentGroupName("BlendShape validation short array");
     slider_for("pupil_up").value=88f;Undo.FlushUndoRecordObjects();
@@ -79,13 +84,13 @@ switch(step) {
     Undo.PerformUndo();check(weight_count()==2 && renderer.GetBlendShapeWeight(0)==12f && renderer.GetBlendShapeWeight(1)==37f,"Undo restores partial array and values");
     break;
    case 6:
-    check(root.Query<Slider>().ToList().Count==720 && slider_for("pupil_up").value==0f,"Partial-array Undo restores missing slider to zero");
+    check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==720 && slider_for("pupil_up").value==0f,"Partial-array Undo restores missing slider to zero");
 
     var body_mesh=instance.GetComponentsInChildren<SkinnedMeshRenderer>(true).First(r=>r.sharedMesh.blendShapeCount==111).sharedMesh;
     using(var so=new SerializedObject(renderer)) {so.FindProperty("m_Mesh").objectReferenceValue=body_mesh;so.ApplyModifiedPropertiesWithoutUndo();}
     break;
    case 7:
-    check(root.Query<Slider>().ToList().Count==106 && weight_count()==2,"Mesh replacement refreshes rows without filling weights");
+    check(root.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==106 && weight_count()==2,"Mesh replacement refreshes rows without filling weights");
 
     break;
   }

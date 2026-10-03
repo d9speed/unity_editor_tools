@@ -1,0 +1,111 @@
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using UnityEngine;
+using UnityEditor;
+using UnityEditor.UIElements;
+using UnityEditor.SceneManagement;
+using UnityEngine.UIElements;
+var asset=AssetDatabase.LoadAssetAtPath<GameObject>("Assets/EMOLab Avatars/Ramune/Base/Fbx/Ramune_Base.fbx");
+if(asset==null) return "Ramune_Base.fbx required";
+var window=Resources.FindObjectsOfTypeAll<EditorWindow>().First(w=>w.GetType().Name=="InspectorWindow");
+var scene=EditorSceneManager.NewPreviewScene();
+Editor editor=null;
+VisualElement root=null;
+bool keep_preview=false;
+var results=new List<string>();
+try {
+ var instance=(GameObject)PrefabUtility.InstantiatePrefab(asset,scene);
+ instance.name="ramune_tabs_validation_instance";
+ var renderer=instance.GetComponentsInChildren<SkinnedMeshRenderer>(true).First(r=>r.sharedMesh.blendShapeCount==737);
+ editor=Editor.CreateEditor(renderer);
+ root=editor.CreateInspectorGUI();
+ root.name="blend_shape_tabs_validation";
+ foreach(var child in root.Children()) child.style.display=child is Foldout fold && fold.text=="BlendShapes" ? DisplayStyle.Flex : DisplayStyle.None;
+ var section=root.Query<Foldout>().ToList().First(f=>f.text=="BlendShapes");
+ section.SetValueWithoutNotify(true);
+ root.style.position=Position.Absolute;root.style.left=0;root.style.top=0;root.style.bottom=0;root.style.width=320;
+ root.style.backgroundColor=new Color(0.18f,0.18f,0.18f);
+ window.rootVisualElement.Add(root);
+ var context=new Dictionary<string,object>();context["scene"]=scene;context["editor"]=editor;context["instance"]=instance;
+ root.userData=context;
+ var rows=root.Q<VisualElement>("blend_shape_rows");
+ var bar=root.Q<VisualElement>("blend_shape_tab_bar");
+ var scroll=root.Q<ScrollView>("blend_shape_tab_scroll");
+ Func<List<ToolbarToggle>> tabs=()=>root.Query<ToolbarToggle>(className:"blend_shape_tab").ToList();
+ Action<Button> click=b=>{using(var submit=NavigationSubmitEvent.GetPooled()){submit.target=b;b.SendEvent(submit);}};
+ Action<string> select=title=>tabs().First(b=>b.text==title).value=true;
+ Action<bool,string> check=(condition,message)=>{if(!condition)throw new Exception(message);results.Add("PASS "+message);};
+ await Task.Delay(450);
+ check(tabs().Count==19,"18 groups plus All tab");
+ check(section.contentContainer.IndexOf(bar)==section.contentContainer.IndexOf(root.Query<Button>().ToList().First(b=>b.text=="全BlendShapeを0にリセット"))+1,"Tabs immediately below reset");
+ check(rows.Query<Foldout>().ToList().Count==0,"No group foldout triangles");
+ select("リップシンク");check(rows.Query<Slider>().ToList().Count==18,"Ungrouped visemes preserved as lip-sync tab");
+ select("BROW");check(rows.Query<Slider>().ToList().Count==36,"BROW shows 36 rows");
+ check(tabs().All(t=>t.style.backgroundColor.keyword==StyleKeyword.Null && t.style.color.keyword==StyleKeyword.Null && t.style.unityFontStyleAndWeight.keyword==StyleKeyword.Null),"Tab color and font use Unity theme defaults");
+ var selected_tab=tabs().First(t=>t.value);selected_tab.value=false;check(selected_tab.value && tabs().Count(t=>t.value)==1,"Clicking selected tab keeps exactly one active tab");
+ select("MMD");check(rows.Query<Slider>().ToList().Count==46,"MMD shows 46 rows");
+ check(tabs().Count(b=>b.ClassListContains("blend_shape_tab_selected"))==1 && tabs().First(b=>b.text=="MMD").ClassListContains("blend_shape_tab_selected"),"Exactly one selected tab uses the native selected state");
+ using(var so=new SerializedObject(renderer)) check(so.FindProperty("m_BlendShapeWeights").arraySize==0,"Switching tabs does not materialize weights");
+ Editor second=null;
+ try {
+  second=Editor.CreateEditor(renderer);
+  var reopened=second.CreateInspectorGUI();
+  check(reopened.Q<VisualElement>("blend_shape_rows").Query<Slider>().ToList().Count==46,"Selected tab restored when inspector reopens");
+ } finally {if(second!=null)UnityEngine.Object.DestroyImmediate(second);}
+ select("すべて");check(rows.Query<Slider>().ToList().Count==720,"All tab preserves all 720 controls");
+ var nonzero=root.Query<Toggle>().ToList().First(t=>t.label=="0より大きいものだけ表示");
+ nonzero.value=true;check(rows.Query<Slider>().ToList().Count==0 && rows.Q<HelpBox>()!=null && tabs().Count==19,"Empty filter keeps tabs and explains empty content");
+ nonzero.value=false;
+ select("BROW");
+ var search=root.Query<TextField>().ToList().First(f=>f.label=="Search");
+ search.value="pupil_up";check(rows.Query<Slider>().ToList().Count==0,"Search is scoped to selected tab");
+ select("すべて");check(rows.Query<Slider>().ToList().Count==1,"All tab searches across groups");
+ search.value="";select("MMD");
+ scroll.scrollOffset=Vector2.zero;
+ await Task.Delay(200);
+ float narrow_limit=scroll.horizontalScroller.highValue;
+ check(narrow_limit>0 && scroll.contentContainer.layout.width>scroll.contentViewport.layout.width,"320px inspector overflows horizontally");
+ check(tabs().All(b=>Mathf.Abs(b.worldBound.y-tabs()[0].worldBound.y)<1),"Tabs stay on one row");
+ click(root.Q<Button>("blend_shape_tabs_next"));check(scroll.scrollOffset.x>0,"Right arrow scrolls horizontally");
+ click(root.Q<Button>("blend_shape_tabs_previous"));check(scroll.scrollOffset.x<1,"Left arrow returns to start");
+ using(var wheel=WheelEvent.GetPooled(new Event {type=EventType.ScrollWheel,delta=new Vector2(0,3),mousePosition=scroll.worldBound.center})) {wheel.target=scroll;scroll.SendEvent(wheel);}
+ check(scroll.scrollOffset.x>0,"Mouse wheel scrolls horizontally");
+ scroll.scrollOffset=new Vector2(scroll.horizontalScroller.highValue,0);
+ await Task.Delay(200);
+ var last=tabs().Last();
+ check(last.text=="MMD" && last.worldBound.xMin>=scroll.contentViewport.worldBound.xMin-1 && last.worldBound.xMax<=scroll.contentViewport.worldBound.xMax+1,"Last MMD tab is reachable");
+ check(!root.Q<Button>("blend_shape_tabs_next").enabledSelf,"Right arrow disables at end");
+ root.style.width=740;
+ await Task.Delay(250);
+ check(scroll.horizontalScroller.highValue<narrow_limit && bar.worldBound.xMax<=root.worldBound.xMax+1,"Wide inspector reflows without horizontal overflow");
+ root.style.width=320;
+ using(var so=new SerializedObject(renderer)) {
+  var weights=so.FindProperty("m_BlendShapeWeights");weights.arraySize=737;
+  for(int i=0;i<737;i++)weights.GetArrayElementAtIndex(i).floatValue=0;
+  weights.GetArrayElementAtIndex(145).floatValue=35;weights.GetArrayElementAtIndex(691).floatValue=60;
+  so.ApplyModifiedPropertiesWithoutUndo();
+ }
+ await Task.Delay(350);
+ Undo.IncrementCurrentGroup();Undo.SetCurrentGroupName("BlendShape tabs validation reset");
+ click(root.Query<Button>().ToList().First(b=>b.text=="全BlendShapeを0にリセット"));Undo.FlushUndoRecordObjects();
+ check(renderer.GetBlendShapeWeight(145)==0 && renderer.GetBlendShapeWeight(691)==0,"Reset clears selected and other groups");
+ Undo.PerformUndo();
+ check(renderer.GetBlendShapeWeight(145)==35 && renderer.GetBlendShapeWeight(691)==60,"Reset Undo restores values across groups");
+ await Task.Delay(350);
+ check(rows.Query<Slider>().ToList().First().value==60,"Selected tab stays bound after reset Undo");
+ scroll.ScrollTo(tabs().First(b=>b.text=="MMD"));
+ await Task.Delay(200);
+ context["results"]=results;
+ keep_preview=false;
+ return string.Join("\n",results);
+} catch(Exception error) {return string.Join("\n",results)+"\nFAIL "+error;}
+finally {
+ if(!keep_preview) {
+  if(root!=null)root.RemoveFromHierarchy();
+  if(editor!=null)UnityEngine.Object.DestroyImmediate(editor);
+  foreach(var item in scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<SkinnedMeshRenderer>(true))) Undo.ClearUndo(item);
+  EditorSceneManager.ClosePreviewScene(scene);
+ }
+}
