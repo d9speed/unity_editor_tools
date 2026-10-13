@@ -28,6 +28,11 @@ public partial class HumanoidAliasComponentCopierWindow
         mode.RegisterValueChangedCallback(evt => { copy_mode = (ComponentCopyMode)modes.IndexOf(evt.newValue); RefreshPreview(); });
         panel.Add(mode);
         mode.tooltip = "同じ型のコンポーネントは、チェックされたコピー元の並び順でコピー先に対応付けます。";
+        var reset_ma = EditorUiControls.Toggle("SkinnedMeshペアがある場合、MAの同期一覧・素体参照を未設定でコピー", clear_ma_avatar_references,
+            value => { clear_ma_avatar_references = value; Scan(); });
+        reset_ma.name = "reset_ma_avatar_references";
+        reset_ma.tooltip = "ペアになったメッシュ上のBlend Shape Syncの同期一覧と、MAの素体・未解決参照を空にします。その他の設定は保持します。";
+        panel.Add(reset_ma);
         var manual = EditorUiControls.Foldout("対応先を手動指定（ボーン・メッシュ・その他の階層）");
         var from = EditorUiControls.Field(new ObjectField("コピー元Transform") { objectType = typeof(Transform), allowSceneObjects = true });
         var to = EditorUiControls.Field(new ObjectField("対応先Transform") { objectType = typeof(Transform), allowSceneObjects = true });
@@ -124,11 +129,21 @@ public partial class HumanoidAliasComponentCopierWindow
     private void AddReferencePreview(Component component, CopyPlan plan)
     {
         var issues = new List<string>();
+        var reset = build_ma_reference_reset(component, sourceScan);
+        if (reset != null)
+        {
+            var reset_details = EditorUiControls.Foldout($"未設定でコピー: {component.name} / {component.GetType().Name}", true);
+            reset_details.Add(EditorUiControls.Label(reset.description));
+            componentReportView?.Add(reset_details);
+        }
         using (var serialized = new SerializedObject(component))
         {
             var property = serialized.GetIterator();
             while (property.Next(true))
             {
+                if (reset != null && (reset.arrays.Any(path => property.propertyPath.StartsWith(path + ".", StringComparison.Ordinal))
+                    || reset.avatar_references.Any(path => property.propertyPath.StartsWith(path + ".", StringComparison.Ordinal))
+                    || reset.direct_references.Contains(property.propertyPath))) continue;
                 if (property.propertyType != SerializedPropertyType.ObjectReference || property.propertyPath == "m_GameObject" || property.propertyPath == "m_Script") continue;
                 var reference = property.objectReferenceValue;
                 if (!EditorComponentCopyHelper.IsInside(reference, sourceScan.Root.transform)) continue;

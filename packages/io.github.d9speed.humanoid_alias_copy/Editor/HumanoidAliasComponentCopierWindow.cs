@@ -330,14 +330,16 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
                 : existing == null ? "追加" : copy_mode == ComponentCopyMode.UpdateOrAdd ? "更新"
                 : copy_mode == ComponentCopyMode.SkipExisting ? "スキップ" : "追加";
             if (component is ParticleSystemRenderer && existing != null && copy_mode != ComponentCopyMode.SkipExisting) operation = "更新（自動付属Renderer）";
+            var reset = operation != "スキップ" ? build_ma_reference_reset(component, sourceScan) : null;
             rows.Add(new CopyRow
             {
                 SourceComponent = component,
-                Operation = operation + ": " + component.GetType().Name,
+                Operation = operation + (reset != null ? "（参照未設定）" : "") + ": " + component.GetType().Name,
                 SourceName = component.gameObject.name,
                 TargetName = targetName,
                 Method = method ?? "未解決",
                 Tooltip = $"コピー元: {HumanoidMappingHelper.GetRelativePath(sourceScan.Root.transform, component.transform)}\nコピー先: {targetPath}"
+                    + (reset != null ? "\n未設定: " + reset.description : "")
             });
             if (!excluded_components.Contains(component) && operation != "スキップ") AddReferencePreview(component, plan);
         }
@@ -492,10 +494,12 @@ public partial class HumanoidAliasComponentCopierWindow : EditorWindow
             {
                 Undo.RecordObject(pair.Value, "Copy component values");
                 if (!TryCopySerializedComponent(pair.Key, pair.Value, warnings)) throw new InvalidOperationException("値のコピーに失敗しました。");
+                apply_ma_reference_reset(pair.Value, build_ma_reference_reset(pair.Key, sourceScan));
             }
             foreach (var pair in copiedPairs)
             {
                 RemapSerializedObjectReferences(pair.Value, sourceScan, targetScan, plan.AddedObjects, addedMap, componentMap);
+                remap_ma_local_reference_paths(pair.Key, pair.Value, sourceScan, targetScan, plan.AddedObjects, addedMap);
                 EditorComponentCopyHelper.RecordPrefabChanges(pair.Value);
             }
             Undo.FlushUndoRecordObjects();

@@ -1,0 +1,249 @@
+{
+  "sdk_absent": {
+    "regression": {
+      "unity": "2022.3.22f1",
+      "passed": true,
+      "checks": [
+        {
+          "name": "Lime-style six collider name collisions resolve to skin bones",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Repeated copy updates existing helper hierarchy without duplicates",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Each category copy can be undone as one operation",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Name-only rigs retain legacy alias matching and reference remapping",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Two real skinned rigs remain ambiguous and block copying",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Manual mapping can resolve a real bone ambiguity",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Duplicate auxiliary leaf names use their full hierarchy paths",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "References outside the selected source are preserved",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Humanoid configuration maps bones with arbitrary names and spaced finger keys",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Changing skin bone references invalidates the preview",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Actual Lime/Rurune hierarchy metadata resolves without false ambiguity",
+          "passed": true,
+          "detail": "ok"
+        }
+      ]
+    },
+    "ma_references": {
+      "unity": "2022.3.22f1",
+      "passed": true,
+      "ma_version": "absent",
+      "checks": [
+        {
+          "name": "MA reset defaults on and external Unity Constraint references remain intact",
+          "passed": true,
+          "detail": "ok"
+        }
+      ]
+    },
+    "ui": {
+      "passed": true,
+      "unity": "2022.3.22f1",
+      "checks": [
+        "Exactly three tabs, separate common copy, classification and resizable columns",
+        "Constraint copy changes checked rows only; other tabs, materials and common colliders stay unchanged; Undo",
+        "Missing hierarchy is created only for checked components in the active tab",
+        "Common copy changes only selected common components, leaving materials unchanged",
+        "Upper material copy respects mesh selection, leaves all components unchanged, supports Undo and disabling",
+        "physbone_dark layout, theme and footer",
+        "physbone_light layout, theme and footer",
+        "narrow layout, theme and footer",
+        "constraint_dark layout, theme and footer",
+        "Real checkbox events persist across tabs; all unchecked disables copy and execution is a no-op",
+        "ma_dark layout, theme and footer",
+        "materials_expanded layout, theme and footer",
+        "Material table checkbox excludes the mesh and keeps its selection across tabs"
+      ],
+      "errors": []
+    }
+  },
+  "sdk_and_ma": {
+    "regression": {
+      "unity": "2022.3.22f1",
+      "passed": true,
+      "checks": [
+        {
+          "name": "Lime-style six collider name collisions resolve to skin bones",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Repeated copy updates existing helper hierarchy without duplicates",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Each category copy can be undone as one operation",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Name-only rigs retain legacy alias matching and reference remapping",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Two real skinned rigs remain ambiguous and block copying",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Manual mapping can resolve a real bone ambiguity",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Duplicate auxiliary leaf names use their full hierarchy paths",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "References outside the selected source are preserved",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Humanoid configuration maps bones with arbitrary names and spaced finger keys",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Changing skin bone references invalidates the preview",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "VRC ParentConstraint and PhysBone collider references follow copied helpers",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Actual Lime/Rurune hierarchy metadata resolves without false ambiguity",
+          "passed": true,
+          "detail": "ok"
+        }
+      ]
+    },
+    "ma_references": {
+      "unity": "2022.3.22f1",
+      "passed": true,
+      "ma_version": "1.18.7",
+      "checks": [
+        {
+          "name": "MA reset defaults on and external Unity Constraint references remain intact",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Paired differently named meshes receive empty Blend Shape Sync; source and enabled state preserved; Undo",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Mesh Settings clears direct and path-only body references while preserving bounds and modes",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Local clothing references remap to the destination while external references clear",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Bone Proxy clears humanoid bone and subpath, keeping attachment mode and scale option",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Armature components clear avatar targets and direct bone references while preserving unrelated settings",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Unresolved path and avatar-root references clear, and animator settings and assets survive",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Opt-out and missing mesh pairs retain the previous copy behavior",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Updating resets existing bindings; repeated copy avoids duplicates; skip and exclusion preserve settings; Undo",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Cleared sync stops live editor shape synchronization immediately",
+          "passed": true,
+          "detail": "ok"
+        },
+        {
+          "name": "Serialized copied settings contain neither body references nor old reference paths",
+          "passed": true,
+          "detail": "ok"
+        }
+      ]
+    },
+    "ui": {
+      "passed": true,
+      "unity": "2022.3.22f1",
+      "checks": [
+        "Exactly three tabs, separate common copy, classification and resizable columns",
+        "Constraint copy changes checked rows only; other tabs, materials and common colliders stay unchanged; Undo",
+        "Missing hierarchy is created only for checked components in the active tab",
+        "Common copy changes only selected common components, leaving materials unchanged",
+        "Upper material copy respects mesh selection, leaves all components unchanged, supports Undo and disabling",
+        "PhysBone tab copies colliders and remaps references without copying other categories",
+        "MA tab copies MA only",
+        "physbone_dark layout, theme and footer",
+        "physbone_light layout, theme and footer",
+        "narrow layout, theme and footer",
+        "constraint_dark layout, theme and footer",
+        "Real checkbox events persist across tabs; all unchecked disables copy and execution is a no-op",
+        "ma_dark layout, theme and footer",
+        "materials_expanded layout, theme and footer",
+        "Material table checkbox excludes the mesh and keeps its selection across tabs"
+      ],
+      "errors": []
+    }
+  }
+}
