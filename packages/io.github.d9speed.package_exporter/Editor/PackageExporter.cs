@@ -24,7 +24,7 @@ namespace D9speedBaseEditorUtil
 {
 
 
-public class PackageExporter : EditorWindow
+public partial class PackageExporter : EditorWindow
 {
     private const string LastProfilePathEditorPrefsKey = "D9speed.PackageExporter.LastProfilePath";
     private const string root_class = "package-exporter";
@@ -38,6 +38,7 @@ public class PackageExporter : EditorWindow
     private const int max_additional_name_strings = 5;
     private const int date_format_part_token = -1;
     private const int subfolder_name_part_token = -2;
+    private const int max_outside_root_display_count = 30;
 
     // シリアライズ可能にして、EditorWindow上で編集可能にする
     [SerializeField] private string exportPath = "";
@@ -58,8 +59,14 @@ public class PackageExporter : EditorWindow
     [SerializeField] private bool pendingNestedPrefabSelection = false;
     [SerializeField] private List<string> detectedNestedPrefabPaths = new List<string>();
     [SerializeField] private List<string> detectedExcludedImageWarnings = new List<string>();
+    [SerializeField] private List<string> detectedOutsideRootAssets = new List<string>();
     [SerializeField] private string currentProfilePath = "";
     private bool exportPrecheckScanScheduled = false;
+    // CLIなど画面を持たない実行では、Unityのエクスポート確認ダイアログを出さない
+    private bool headlessMode = false;
+    // 許可フォルダはEditorPrefs（Preferences > D9speed > Package Exporter）に保存する。CLIでは一時的に上書きできる
+    private string allowedRootsOverride = null;
+    private Label allowedRootLabel;
     private Label currentProfilePathLabel;
     private Label packagePreviewLabel;
     private HelpBox packagePreviewWarningBox;
@@ -470,6 +477,15 @@ public class PackageExporter : EditorWindow
             RefreshUI();
         }, button_add_class));
 
+        var allowedRootRow = CreateRow();
+        allowedRootLabel = EditorUiControls.Label("");
+        allowedRootRow.Add(allowedRootLabel);
+        allowedRootRow.Add(CreateButton("変更…", () =>
+        {
+            SettingsService.OpenUserPreferences(PackageExporterPreferencesProvider.PreferencesPath);
+        }, button_select_class));
+        box.Add(allowedRootRow);
+
         box.Add(CreateToggle("除外: 名前に '-' を含むフォルダ", excludeDirectoriesWithHyphen, value =>
         {
             excludeDirectoriesWithHyphen = value;
@@ -529,6 +545,7 @@ public class PackageExporter : EditorWindow
                 : "現在のプロファイル: " + currentProfilePath;
         }
 
+        RefreshAllowedRootLabel();
         RefreshPackageNamePreview();
         subfolderNamePartField?.SetValueWithoutNotify(GetSubfolderPreviewName());
         RefreshSubfolderCheckboxes();
@@ -547,6 +564,25 @@ public class PackageExporter : EditorWindow
         {
             cancelNestedPrefabSelectionButton.style.display = pendingNestedPrefabSelection ? DisplayStyle.Flex : DisplayStyle.None;
         }
+    }
+
+    // Preferencesで許可フォルダを変えて戻ってきたときに表示を合わせる
+    private void OnFocus()
+    {
+        RefreshAllowedRootLabel();
+    }
+
+    private void RefreshAllowedRootLabel()
+    {
+        if (allowedRootLabel == null)
+        {
+            return;
+        }
+
+        string roots = PackageExportAssetRootGuard.FormatRoots(AllowedAssetRoots);
+        allowedRootLabel.text = string.IsNullOrEmpty(roots)
+            ? "許可フォルダ: 未設定（確認しない）"
+            : "許可フォルダ: " + roots;
     }
 
     private void OnMainSettingChanged()
@@ -872,7 +908,9 @@ public class PackageExporter : EditorWindow
         }
 
         precheckContainer.Clear();
-        bool hasPrecheck = pendingNestedPrefabSelection || detectedExcludedImageWarnings.Count > 0;
+        bool hasPrecheck = pendingNestedPrefabSelection
+            || detectedExcludedImageWarnings.Count > 0
+            || detectedOutsideRootAssets.Count > 0;
         precheckContainer.style.display = hasPrecheck ? DisplayStyle.Flex : DisplayStyle.None;
         if (!hasPrecheck)
         {
@@ -908,6 +946,13 @@ public class PackageExporter : EditorWindow
                 HelpBoxMessageType.Warning));
         }
 
+        if (detectedOutsideRootAssets.Count > 0)
+        {
+            precheckContainer.Add(new HelpBox(
+                $"{PackageExportAssetRootGuard.FormatRoots(AllowedAssetRoots)} 以外のアセットが {detectedOutsideRootAssets.Count} 件含まれます。他者のアセットや共有シェーダーが混ざっていないか確認してください。",
+                HelpBoxMessageType.Warning));
+        }
+
         if (detectedNestedPrefabPaths.Count > 0)
         {
             precheckContainer.Add(new Label("ネストPrefab") { style = { unityFontStyleAndWeight = FontStyle.Bold } });
@@ -923,6 +968,19 @@ public class PackageExporter : EditorWindow
             foreach (string warning in detectedExcludedImageWarnings)
             {
                 precheckContainer.Add(new Label(warning) { style = { whiteSpace = WhiteSpace.Normal, fontSize = 11 } });
+            }
+        }
+
+        if (detectedOutsideRootAssets.Count > 0)
+        {
+            precheckContainer.Add(new Label("許可フォルダ外のアセット") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 4 } });
+            foreach (string outsidePath in detectedOutsideRootAssets.Take(max_outside_root_display_count))
+            {
+                precheckContainer.Add(new Label(outsidePath) { style = { whiteSpace = WhiteSpace.Normal, fontSize = 11 } });
+            }
+            if (detectedOutsideRootAssets.Count > max_outside_root_display_count)
+            {
+                precheckContainer.Add(new Label($"ほか {detectedOutsideRootAssets.Count - max_outside_root_display_count} 件（全件はConsoleに出力）") { style = { fontSize = 11 } });
             }
         }
     }
@@ -1381,6 +1439,7 @@ public class PackageExporter : EditorWindow
         pendingNestedPrefabSelection = false;
         detectedNestedPrefabPaths.Clear();
         detectedExcludedImageWarnings.Clear();
+        detectedOutsideRootAssets.Clear();
     }
 
     /// <summary>
@@ -1397,6 +1456,10 @@ public class PackageExporter : EditorWindow
 
             CancelScheduledExportPrecheckScan();
             UpdateExportPrecheck(selectedFolders, exclusionRegex);
+            if (!ConfirmOutsideRootAssets())
+            {
+                return;
+            }
             ExecuteBatchExport(selectedFolders, exclusionRegex, detectedNestedPrefabPaths);
             ResetNestedPrefabSelectionState();
         }
@@ -1492,6 +1555,37 @@ public class PackageExporter : EditorWindow
         bool includeNestedPrefabDependencies,
         HashSet<string> detectedNestedPrefabSet)
     {
+        HashSet<string> assetPathsToExport = CollectExportAssetPaths(
+            folder,
+            exclusionRegex,
+            overrideExclusion,
+            includeNestedPrefabDependencies,
+            detectedNestedPrefabSet);
+
+        string folderName = System.IO.Path.GetFileName(folder);
+        string packageFileName = BuildPackageFileName(folderName, dateString);
+        string packageFullPath = System.IO.Path.Combine(outPath, packageFileName);
+
+        string reportFileName = $"{System.IO.Path.GetFileNameWithoutExtension(packageFileName)}_components.json";
+        string reportFilePath = System.IO.Path.Combine(outPath, reportFileName);
+
+        // エクスポート処理
+        ExportPackage(assetPathsToExport.ToArray(), packageFullPath);
+
+        WriteExportedAssetsJsonReport(assetPathsToExport, reportFilePath, packageFullPath, includeMetaFiles, includeOtherComponentsInLog);
+        return packageFullPath;
+    }
+
+    /// <summary>
+    /// フォルダ内のアセットと依存アセットのうち、パッケージに含めるものを集める
+    /// </summary>
+    private HashSet<string> CollectExportAssetPaths(
+        string folder,
+        Regex exclusionRegex,
+        bool overrideExclusion,
+        bool includeNestedPrefabDependencies,
+        HashSet<string> detectedNestedPrefabSet)
+    {
         HashSet<string> assetPathsToExport = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         HashSet<string> visitedAssetPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1511,18 +1605,7 @@ public class PackageExporter : EditorWindow
                 false);
         }
 
-        string folderName = System.IO.Path.GetFileName(folder);
-        string packageFileName = BuildPackageFileName(folderName, dateString);
-        string packageFullPath = System.IO.Path.Combine(outPath, packageFileName);
-
-        string reportFileName = $"{System.IO.Path.GetFileNameWithoutExtension(packageFileName)}_components.json";
-        string reportFilePath = System.IO.Path.Combine(outPath, reportFileName);
-
-        // エクスポート処理
-        ExportPackage(assetPathsToExport.ToArray(), packageFullPath);
-
-        WriteExportedAssetsJsonReport(assetPathsToExport, reportFilePath, packageFullPath, includeMetaFiles, includeOtherComponentsInLog);
-        return packageFullPath;
+        return assetPathsToExport;
     }
 
     private string BuildPackageFileName(string folderName, string dateString)
@@ -1821,12 +1904,66 @@ public class PackageExporter : EditorWindow
 
         detectedNestedPrefabPaths = nestedPrefabs;
         detectedExcludedImageWarnings = excludedImageWarnings;
+        detectedOutsideRootAssets = DetectOutsideRootAssets(selectedFolders, exclusionRegex, nestedPrefabs);
         pendingNestedPrefabSelection = nestedPrefabs.Count > 0 || excludedImageWarnings.Count > 0;
         RefreshUI();
         if (nestedPrefabs.Count > 0)
         {
             Debug.Log($"Nested prefabs detected: {nestedPrefabs.Count}");
         }
+        if (detectedOutsideRootAssets.Count > 0)
+        {
+            Debug.LogWarning(
+                $"[PackageExporter] {PackageExportAssetRootGuard.FormatRoots(AllowedAssetRoots)} 以外のアセットが {detectedOutsideRootAssets.Count} 件含まれます。\n"
+                + string.Join("\n", detectedOutsideRootAssets));
+        }
+    }
+
+    private string AllowedAssetRoots => allowedRootsOverride ?? PackageExportAssetRootGuard.GetAllowedRootsSetting();
+
+    private List<string> DetectOutsideRootAssets(List<string> selectedFolders, Regex exclusionRegex, List<string> nestedPrefabs)
+    {
+        if (PackageExportAssetRootGuard.ParseRoots(AllowedAssetRoots).Count == 0)
+        {
+            return new List<string>();
+        }
+
+        var nestedPrefabSet = new HashSet<string>(nestedPrefabs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+        var allAssets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string folder in selectedFolders)
+        {
+            allAssets.UnionWith(CollectExportAssetPaths(
+                folder,
+                exclusionRegex,
+                overrideExclusionForSubfolders,
+                includeNestedPrefabs,
+                nestedPrefabSet));
+        }
+
+        return PackageExportAssetRootGuard.FindOutsideRoot(allAssets, AllowedAssetRoots);
+    }
+
+    /// <summary>
+    /// 許可フォルダ外のアセットが含まれる場合に、続行するか確認する
+    /// </summary>
+    private bool ConfirmOutsideRootAssets()
+    {
+        if (detectedOutsideRootAssets.Count == 0)
+        {
+            return true;
+        }
+
+        string preview = string.Join("\n", detectedOutsideRootAssets.Take(10));
+        if (detectedOutsideRootAssets.Count > 10)
+        {
+            preview += $"\n…ほか {detectedOutsideRootAssets.Count - 10} 件";
+        }
+
+        return EditorUtility.DisplayDialog(
+            "許可フォルダ外のアセット",
+            $"{PackageExportAssetRootGuard.FormatRoots(AllowedAssetRoots)} 以外のアセットが {detectedOutsideRootAssets.Count} 件含まれます。\n\n{preview}\n\nこのままエクスポートしますか？",
+            "エクスポートする",
+            "中止");
     }
 
     private void CollectExcludedMeshCutterMaskReferences(
@@ -2002,7 +2139,7 @@ public class PackageExporter : EditorWindow
             return;
         }
 
-        var options = openWithTE ? ExportPackageOptions.Default : ExportPackageOptions.Interactive;
+        var options = headlessMode || openWithTE ? ExportPackageOptions.Default : ExportPackageOptions.Interactive;
         AssetDatabase.ExportPackage(assetPaths, packageFullPath, options);
         Debug.Log("Exported package: " + packageFullPath);
     }
