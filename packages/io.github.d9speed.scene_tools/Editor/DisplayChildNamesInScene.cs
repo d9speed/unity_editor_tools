@@ -62,12 +62,22 @@ public static class DisplayChildNamesInScene
     private const string session_key_show_bone_spheres_near_cursor_only = session_key_prefix + "show_bone_spheres_near_cursor_only";
     private const string session_key_enable_bone_sphere_click_selection = session_key_prefix + "enable_bone_sphere_click_selection";
     private const string session_key_bone_sphere_size = session_key_prefix + "bone_sphere_size";
+    private const string session_key_show_humanoid_capsules = session_key_prefix + "show_humanoid_capsules";
+    private const string session_key_humanoid_capsule_thickness = session_key_prefix + "humanoid_capsule_thickness";
 
     private const float default_cursor_radius_pixels = 80f;
     private const float default_label_hold_radius_pixels = 180f;
     private const float default_max_depth = 0f;
     private const float default_bone_sphere_size = 0.06f;
     private const float max_bone_sphere_size = 1.0f;
+    private const float default_humanoid_capsule_thickness = 0.15f;
+    private const float min_humanoid_capsule_thickness = 0.03f;
+    private const float max_humanoid_capsule_thickness = 0.5f;
+    private const int humanoid_capsule_arc_segments = 10;
+    private static readonly Vector3[] humanoid_capsule_points = new Vector3[(humanoid_capsule_arc_segments + 1) * 2 + 1];
+    private static readonly Color humanoid_capsule_left_color = new Color(0.35f, 0.65f, 1f, 0.85f);
+    private static readonly Color humanoid_capsule_right_color = new Color(1f, 0.45f, 0.4f, 0.85f);
+    private static readonly Color humanoid_capsule_center_color = new Color(1f, 0.85f, 0.3f, 0.85f);
     private static readonly Vector2 default_gui_offset = new Vector2(0, 20);
     private const int default_font_size = 14;
     private static readonly Color default_label_color = Color.white;
@@ -196,6 +206,24 @@ public static class DisplayChildNamesInScene
         }
     }
 
+    private enum HumanoidBoneSide
+    {
+        Center,
+        Left,
+        Right
+    }
+
+    // start -> end is the capsule axis. A leaf bone has no humanoid child, so its
+    // capsule extends from start along (parent -> start) by leaf_length_ratio.
+    private struct HumanoidCapsuleSegment
+    {
+        public Transform start;
+        public Transform end;
+        public Transform leaf_parent;
+        public float leaf_length_ratio;
+        public HumanoidBoneSide side;
+    }
+
     private struct BoneSphereDrawInfo
     {
         public Transform bone;
@@ -215,6 +243,7 @@ public static class DisplayChildNamesInScene
         public readonly List<LabelHitArea> visible_labels = new List<LabelHitArea>();
         public readonly List<LabelDisplayInfo> labels = new List<LabelDisplayInfo>();
         public readonly List<BoneSphereDrawInfo> spheres = new List<BoneSphereDrawInfo>();
+        public readonly List<HumanoidCapsuleSegment> humanoid_capsules = new List<HumanoidCapsuleSegment>();
         public bool bone_cache_dirty = true;
         public bool has_mouse_position;
         public Vector2 mouse_position;
@@ -273,6 +302,8 @@ public static class DisplayChildNamesInScene
     private static bool show_vrc_phys_bone_components = true;
     private static bool show_bone_spheres = true;
     private static bool show_bone_hierarchy = true;
+    private static bool show_humanoid_capsules = false;
+    private static float humanoid_capsule_thickness = default_humanoid_capsule_thickness;
     private static bool show_bone_spheres_near_cursor_only = true;
     private static bool enable_bone_sphere_click_selection = false;
     private static Dictionary<Transform, List<Component>> phys_bone_root_reference_cache = new Dictionary<Transform, List<Component>>();
@@ -357,6 +388,7 @@ public static class DisplayChildNamesInScene
 
             // Rendering is not gated by another tool's hotControl.
             draw_bone_hierarchy(sceneView, state);
+            draw_humanoid_capsules(sceneView, state);
             DrawBoneSpheres(sceneView, state, sphere_control_id);
 
             Handles.BeginGUI();
@@ -657,6 +689,7 @@ public static class DisplayChildNamesInScene
             (bone.gameObject.hideFlags & HideFlags.HideInHierarchy) == 0)
             .OrderBy(bone => bone.GetInstanceID()));
         state.bones = new HashSet<Transform>(state.ordered_bones);
+        refresh_humanoid_capsule_cache(current_stage, state);
         state.transform_stage = current_stage;
         state.bone_cache_dirty = false;
         state.column_content_dirty = true;
@@ -757,6 +790,191 @@ public static class DisplayChildNamesInScene
             Handles.color = previous_color;
             Handles.zTest = previous_z_test;
         }
+    }
+
+    private static bool is_humanoid_capsule_excluded(int bone_index)
+    {
+        // Eyes and jaw are facial pivots, not limb segments. Head stays a leaf capsule.
+        return bone_index == (int)HumanBodyBones.LeftEye || bone_index == (int)HumanBodyBones.RightEye ||
+            bone_index == (int)HumanBodyBones.Jaw;
+    }
+
+    private static HumanoidBoneSide get_humanoid_bone_side(int bone_index)
+    {
+        string bone_name = ((HumanBodyBones)bone_index).ToString();
+        if (bone_name.StartsWith("Left"))
+            return HumanoidBoneSide.Left;
+        if (bone_name.StartsWith("Right"))
+            return HumanoidBoneSide.Right;
+        return HumanoidBoneSide.Center;
+    }
+
+    private static int get_present_humanoid_parent(Transform[] bones, int bone_index)
+    {
+        int parent = HumanTrait.GetParentBone(bone_index);
+        while (parent >= 0 && parent < bones.Length && bones[parent] == null)
+            parent = HumanTrait.GetParentBone(parent);
+        return parent >= 0 && parent < bones.Length ? parent : -1;
+    }
+
+    private static void refresh_humanoid_capsule_cache(StageHandle stage, SceneViewState state)
+    {
+        state.humanoid_capsules.Clear();
+        int bone_count = (int)HumanBodyBones.LastBone;
+        Transform[] bones = new Transform[bone_count];
+        bool[] has_child = new bool[bone_count];
+        foreach (Animator animator in stage.FindComponentsOfType<Animator>())
+        {
+            if (animator == null || EditorUtility.IsPersistent(animator) || !animator.isHuman ||
+                animator.avatar == null || !animator.avatar.isValid)
+                continue;
+            for (int i = 0; i < bone_count; i++)
+            {
+                Transform bone = animator.GetBoneTransform((HumanBodyBones)i);
+                bones[i] = bone != null && state.bones.Contains(bone) ? bone : null;
+                has_child[i] = false;
+            }
+            for (int i = 0; i < bone_count; i++)
+            {
+                if (bones[i] == null || is_humanoid_capsule_excluded(i))
+                    continue;
+                int parent = get_present_humanoid_parent(bones, i);
+                if (parent < 0)
+                    continue;
+                has_child[parent] = true;
+                state.humanoid_capsules.Add(new HumanoidCapsuleSegment
+                {
+                    start = bones[parent], end = bones[i], side = get_humanoid_bone_side(i)
+                });
+            }
+            for (int i = 0; i < bone_count; i++)
+            {
+                if (bones[i] == null || has_child[i] || is_humanoid_capsule_excluded(i))
+                    continue;
+                int parent = get_present_humanoid_parent(bones, i);
+                if (parent < 0)
+                    continue;
+                state.humanoid_capsules.Add(new HumanoidCapsuleSegment
+                {
+                    start = bones[i], leaf_parent = bones[parent], side = get_humanoid_bone_side(i),
+                    leaf_length_ratio = get_humanoid_leaf_length_ratio(i, bones)
+                });
+            }
+        }
+    }
+
+    // Leaf length relative to the parent segment; tuned per body part.
+    private static float get_humanoid_leaf_length_ratio(int bone_index, Transform[] bones)
+    {
+        switch ((HumanBodyBones)bone_index)
+        {
+            case HumanBodyBones.Head:
+                // Without a Neck the parent segment is the whole upper chest.
+                return bones[(int)HumanBodyBones.Neck] != null ? 1.6f : 0.5f;
+            case HumanBodyBones.LeftHand:
+            case HumanBodyBones.RightHand:
+                return 0.35f;
+            case HumanBodyBones.LeftFoot:
+            case HumanBodyBones.RightFoot:
+                return 0.25f;
+            case HumanBodyBones.LeftToes:
+            case HumanBodyBones.RightToes:
+                return 0.5f;
+            default:
+                return 0.6f;
+        }
+    }
+
+    private static bool try_get_humanoid_capsule(Camera camera, HumanoidCapsuleSegment segment,
+        out Vector3 start, out Vector3 end)
+    {
+        start = end = default;
+        if (!is_visible_transform(segment.start))
+            return false;
+        start = segment.start.position;
+        if (segment.end != null)
+        {
+            if (!is_visible_transform(segment.end))
+                return false;
+            end = segment.end.position;
+        }
+        else
+        {
+            if (segment.leaf_parent == null)
+                return false;
+            Vector3 direction = start - segment.leaf_parent.position;
+            end = start + direction * segment.leaf_length_ratio;
+        }
+        if ((end - start).sqrMagnitude < 0.00000001f)
+            return false;
+        // Both ends must be in front of the camera; a half-clipped capsule outline is misleading.
+        return IsDepthVisible(camera, start, out _) && IsDepthVisible(camera, end, out _);
+    }
+
+    private static void draw_humanoid_capsules(SceneView scene_view, SceneViewState state)
+    {
+        if (!show_humanoid_capsules || Event.current.type != EventType.Repaint ||
+            scene_view.camera == null || state.humanoid_capsules.Count == 0)
+            return;
+        Camera camera = scene_view.camera;
+        Color previous_color = Handles.color;
+        CompareFunction previous_z_test = Handles.zTest;
+        try
+        {
+            Handles.zTest = CompareFunction.Always;
+            foreach (HumanoidCapsuleSegment segment in state.humanoid_capsules)
+            {
+                if (!try_get_humanoid_capsule(camera, segment, out Vector3 start, out Vector3 end))
+                    continue;
+                bool selected = Selection.Contains(segment.start.gameObject) ||
+                    (segment.end != null && Selection.Contains(segment.end.gameObject));
+                Handles.color = selected ? Handles.selectedColor :
+                    segment.side == HumanoidBoneSide.Left ? humanoid_capsule_left_color :
+                    segment.side == HumanoidBoneSide.Right ? humanoid_capsule_right_color :
+                    humanoid_capsule_center_color;
+                float radius = Vector3.Distance(start, end) * humanoid_capsule_thickness;
+                draw_wire_capsule(camera, start, end, radius, selected ? 2.5f : 1.5f);
+            }
+        }
+        finally
+        {
+            Handles.color = previous_color;
+            Handles.zTest = previous_z_test;
+        }
+    }
+
+    private static void draw_wire_capsule(Camera camera, Vector3 start, Vector3 end, float radius, float width)
+    {
+        Vector3 axis = end - start;
+        float length = axis.magnitude;
+        if (length <= 0f || radius <= 0f || float.IsNaN(radius) || float.IsInfinity(radius))
+            return;
+        Vector3 direction = axis / length;
+        Vector3 center = (start + end) * 0.5f;
+        Vector3 view = camera.orthographic ? -camera.transform.forward : camera.transform.position - center;
+        // Outline the capsule as seen from the camera: side lines + both hemispheres.
+        Vector3 side = Vector3.Cross(direction, view);
+        if (side.sqrMagnitude < 0.00000001f)
+            side = Vector3.Cross(direction, Mathf.Abs(direction.y) < 0.99f ? Vector3.up : Vector3.right);
+        side.Normalize();
+
+        int n = humanoid_capsule_arc_segments;
+        int index = 0;
+        for (int i = 0; i <= n; i++)
+        {
+            float angle = Mathf.PI * i / n;
+            humanoid_capsule_points[index++] = end + (side * Mathf.Cos(angle) + direction * Mathf.Sin(angle)) * radius;
+        }
+        for (int i = 0; i <= n; i++)
+        {
+            float angle = Mathf.PI * i / n;
+            humanoid_capsule_points[index++] = start + (-side * Mathf.Cos(angle) - direction * Mathf.Sin(angle)) * radius;
+        }
+        humanoid_capsule_points[index] = humanoid_capsule_points[0];
+        Handles.DrawAAPolyLine(width, humanoid_capsule_points);
+        // Rings at both joints give the outline its depth/orientation.
+        Handles.DrawWireDisc(start, direction, radius);
+        Handles.DrawWireDisc(end, direction, radius);
     }
 
     private static void DrawBoneSpheres(SceneView sceneView, SceneViewState state, int control_id)
@@ -1014,13 +1232,15 @@ public static class DisplayChildNamesInScene
                         label_hold_radius_pixels = Mathf.Clamp(label_hold_radius_pixels, 16f, 480f);
                         maxDepth = SanitizeMaxDepth(maxDepth);
                         bone_sphere_size = Mathf.Clamp(bone_sphere_size, 0.01f, max_bone_sphere_size);
+                        humanoid_capsule_thickness = Mathf.Clamp(humanoid_capsule_thickness,
+                            min_humanoid_capsule_thickness, max_humanoid_capsule_thickness);
                         SanitizeColumnSettings();
 
                         GUILayout.Space(5f);
                         Rect actions = GetCompactSettingsRow(22f);
                         float button_width = (actions.width - 6f) * 0.5f;
                         refresh_requested = GUI.Button(new Rect(actions.x, actions.y, button_width, actions.height),
-                            new GUIContent("参照キャッシュ更新", "PhysBoneのRootRef参照を再検出します。表示設定は変更しません。"));
+                            new GUIContent("参照キャッシュ更新", "PhysBoneのRootRef参照とヒューマノイドボーンの割り当てを再検出します。表示設定は変更しません。"));
                         reset_requested = GUI.Button(new Rect(actions.xMax - button_width, actions.y, button_width, actions.height),
                             new GUIContent("設定リセット", "表示・配置・色など、すべてのツール設定を初期値に戻します。"));
                     }
@@ -1072,6 +1292,14 @@ public static class DisplayChildNamesInScene
         GUILayout.Space(3f);
         show_bone_hierarchy = CompactSettingsToggle("ボーン階層（親子線）", show_bone_hierarchy,
             "シーン内のTransformの親子を線で結びます。未使用・補助ボーンを含み、SkinnedMeshRendererで絞り込みません。");
+        show_humanoid_capsules = CompactSettingsToggle("ヒューマノイドボーン（カプセル）", show_humanoid_capsules,
+            "Humanoid設定のAnimatorについて、Avatarに割り当てられたボーンをカプセルで表示します。左は青、右は赤、中心は黄色です。");
+        using (new EditorGUI.DisabledScope(!show_humanoid_capsules))
+        {
+            humanoid_capsule_thickness = CompactSettingsSlider("カプセル太さ", humanoid_capsule_thickness,
+                min_humanoid_capsule_thickness, max_humanoid_capsule_thickness,
+                "カプセルの半径をボーンの長さに対する比率で指定します。");
+        }
         show_bone_spheres = CompactSettingsToggle("ボーン位置スフィア", show_bone_spheres,
             "シーン内のTransformの位置にスフィアを描画します。");
         using (new EditorGUI.DisabledScope(!show_bone_spheres))
@@ -2209,6 +2437,8 @@ public static class DisplayChildNamesInScene
         show_vrc_phys_bone_components = true;
         show_bone_spheres = true;
         show_bone_hierarchy = true;
+        show_humanoid_capsules = false;
+        humanoid_capsule_thickness = default_humanoid_capsule_thickness;
         show_bone_spheres_near_cursor_only = true;
         enable_bone_sphere_click_selection = false;
         cursor_radius_pixels = default_cursor_radius_pixels;
@@ -2242,6 +2472,9 @@ public static class DisplayChildNamesInScene
         show_vrc_phys_bone_components = SessionState.GetBool(session_key_show_vrc_phys_bone_components, true);
         show_bone_spheres = SessionState.GetBool(session_key_show_bone_spheres, true);
         show_bone_hierarchy = SessionState.GetBool(session_key_show_bone_hierarchy, true);
+        show_humanoid_capsules = SessionState.GetBool(session_key_show_humanoid_capsules, false);
+        humanoid_capsule_thickness = Mathf.Clamp(SessionState.GetFloat(session_key_humanoid_capsule_thickness,
+            default_humanoid_capsule_thickness), min_humanoid_capsule_thickness, max_humanoid_capsule_thickness);
         show_bone_spheres_near_cursor_only = SessionState.GetBool(session_key_show_bone_spheres_near_cursor_only, true);
         enable_bone_sphere_click_selection = SessionState.GetBool(session_key_enable_bone_sphere_click_selection, false);
         cursor_radius_pixels = SessionState.GetFloat(session_key_cursor_radius_pixels, default_cursor_radius_pixels);
@@ -2276,6 +2509,9 @@ public static class DisplayChildNamesInScene
         SessionState.SetBool(session_key_show_vrc_phys_bone_components, show_vrc_phys_bone_components);
         SessionState.SetBool(session_key_show_bone_spheres, show_bone_spheres);
         SessionState.SetBool(session_key_show_bone_hierarchy, show_bone_hierarchy);
+        SessionState.SetBool(session_key_show_humanoid_capsules, show_humanoid_capsules);
+        SessionState.SetFloat(session_key_humanoid_capsule_thickness, Mathf.Clamp(humanoid_capsule_thickness,
+            min_humanoid_capsule_thickness, max_humanoid_capsule_thickness));
         SessionState.SetBool(session_key_show_bone_spheres_near_cursor_only, show_bone_spheres_near_cursor_only);
         SessionState.SetBool(session_key_enable_bone_sphere_click_selection, enable_bone_sphere_click_selection);
         SessionState.SetFloat(session_key_cursor_radius_pixels, cursor_radius_pixels);
