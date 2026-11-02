@@ -1,0 +1,27 @@
+{
+  "name": "D9speed.PackageExporter.Editor.Uloop",
+  "rootNamespace": "D9speedBaseEditorUtil.Uloop",
+  "references": [
+    "D9speed.PackageExporter.Editor",
+    "UnityCLILoop.ToolContracts"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "D9SPEED_ULOOP_V3"
+  ],
+  "versionDefines": [
+    {
+      "name": "io.github.hatayama.uloopmcp",
+      "expression": "3.0.0",
+      "define": "D9SPEED_ULOOP_V3"
+    }
+  ],
+  "noEngineReferences": false
+}

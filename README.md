@@ -1,5 +1,7 @@
 # D9speed Unity Editor Tools
 
+Package Exporter 0.2.0で、uloop（Unity CLI Loop）や`-batchmode`から画面なしでバッチ書き出しできるようにしました。Claude CodeやCodexに口語で指示するための手順書も同梱し、許可フォルダ（初期値`Assets/D9speed/`）以外のアセットが含まれると警告します。[使い方](packages/io.github.d9speed.package_exporter/README.md#clillmからの実行)を参照してください。
+
 Editor Core 0.1.11では説明板のフォントをWindowsのインストール済み一覧から選べます。自動選択（メイリオ優先）も利用できます。[使い方](packages/io.github.d9speed.editor_core/README.md#説明画像つき板ポリプレハブ)を参照してください。
 
 Editor Core 0.1.10では説明板の描画をWindows用DLLに分離し、TextMeshProを不要にしました。Unity内では文章を入力し、プレビューを確認してPNGまたはEditorOnlyのプレハブを保存します。Windowsにメイリオがある場合は自動で使用します。

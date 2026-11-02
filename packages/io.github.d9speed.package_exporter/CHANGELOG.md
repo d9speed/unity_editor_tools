@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 - 2026-10-28
+
+- 画面を開かずに実行できる入口`PackageExporterHeadless`を追加。`list` / `plan` / `export`の3モードとJSONの依頼・結果に対応。
+- Unity CLI Loop 3.0以降向けのカスタムツール`uloop d9-package-export`と、LLM向けの手順書（Skill）を同梱。uloop未導入のプロジェクトではコンパイルされない。
+- `-batchmode -executeMethod D9speedBaseEditorUtil.PackageExporterCommandLine.Run`からの実行に対応。
+- 許可フォルダ（初期値`Assets/D9speed/`）以外のアセットが含まれる場合の警告を追加。画面では確認ダイアログ、CLIでは書き出しを停止。
+- 許可フォルダを`Edit > Preferences > D9speed > Package Exporter`で設定可能に（EditorPrefsに保存、`;`区切りで複数指定）。
+
 ## 0.1.5 - 2026-09-21
 
 - 除外キーワードの入力欄が削除ボタンを枠外へ押し出す問題を修正。
