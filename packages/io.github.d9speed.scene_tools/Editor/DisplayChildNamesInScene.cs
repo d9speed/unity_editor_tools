@@ -411,7 +411,23 @@ public static class DisplayChildNamesInScene
                 }
 
                 // Do not omit these controls while a checkbox/transform is hot.
-                DisplayObjectNames(sceneView, state);
+                // IMGUI Toggle/Button grab hotControl on MouseDown of ANY button (GUI.DoControl).
+                // SceneViewMotion only starts RMB/MMB/Alt+LMB navigation while hotControl == 0,
+                // so a checkbox under the cursor used to block orbit/pan/fly and then toggle
+                // the component on release. Hide navigation presses from these controls while
+                // still calling them, so control IDs stay identical across events.
+                bool hide_navigation_press = IsSceneNavigationMouseDown(e);
+                if (hide_navigation_press)
+                    e.type = EventType.Used;
+                try
+                {
+                    DisplayObjectNames(sceneView, state);
+                }
+                finally
+                {
+                    if (hide_navigation_press && e.type == EventType.Used)
+                        e.type = EventType.MouseDown;
+                }
                 // Child controls receive the event first. Empty panel/gutter pixels
                 // must not select/zoom the mesh underneath the floating panel.
                 if (state.column_layout_active && IsPointerOverColumns(state, e.mousePosition) &&
@@ -429,6 +445,14 @@ public static class DisplayChildNamesInScene
             Handles.color = previous_color;
             Handles.matrix = previous_matrix;
         }
+    }
+
+    // A press that Unity's Scene View navigation (orbit, pan, fly, zoom, View tool) handles.
+    // Only MouseDown is hidden: a control already holding hotControl must still see MouseUp.
+    private static bool IsSceneNavigationMouseDown(Event e)
+    {
+        return e.type == EventType.MouseDown &&
+            (e.button != 0 || e.alt || Tools.viewToolActive);
     }
 
     private static void handle_column_label_input(
