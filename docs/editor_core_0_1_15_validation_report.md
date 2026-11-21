@@ -37,7 +37,18 @@
 - サイズ: 86,859 bytes
 - 全78ファイルがソースとSHA-256で一致。GUID重複・不足meta・Editor専用アセンブリなど既存ビルドスクリプトの検査も成功。
 - ZIP SHA-256: `6f26aaaa0554c0ec642cc70ade52edbf1e9caf1b58bf496f32c14dc1be5a5b41`
-- GitHub Release・VPM公開インデックスへの反映は含めていません。
+- 2026-11-21、下記のGitHub ReleaseとVPM公開インデックスへ反映しました。
+
+## 公開確認
+
+- [GitHub Release: editor_core_v0.1.15](https://github.com/d9speed/unity_editor_tools/releases/tag/editor_core_v0.1.15) を通常リリースとして公開。
+- パッケージソースのコミット: `8516066e8825e19dc8e8010ade7b81f5c810d1c4`。
+- VPM一覧・案内ページのコミット: `d3673248436f4278c197987304eec23c0df5bc04`。
+- [公開VPM一覧](https://d9speed.github.io/Unity_Tools/index.json) から0.1.15、配布URL、SHA-256の一致を確認。既存の全パッケージ・全バージョンの内容は維持。
+- 認証なしで公開ZIPを取得し、86,859 bytesと上記SHA-256が一致。
+- [案内ページ](https://d9speed.github.io/Unity_Tools/) のliltoonマテリアルセットアップ項目も反映を確認。
+- 公開中0.1.13からの更新には、検証済み0.1.14の説明画像ツール変更を含むことをリリース説明に明記。
+- VCC / ALCOMの画面から実際に更新する操作は今回行っていません。
 
 ## 参照
 
