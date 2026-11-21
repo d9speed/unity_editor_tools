@@ -11,13 +11,11 @@ namespace D9speed_BaseEditorUtils.GuideBoard
     {
         private const string automatic_font_label = "自動（メイリオ優先）";
         [SerializeField] private guide_board_settings settings = new guide_board_settings();
-        [SerializeField] private string last_save_directory = "Assets";
         private guide_board_preview preview;
         private Image preview_image;
         private Label status_label;
         private Label resolution_label;
         private Button export_button;
-        private Button prefab_button;
         private IVisualElementScheduledItem pending_render;
 
         public void CreateGUI()
@@ -41,7 +39,6 @@ namespace D9speed_BaseEditorUtils.GuideBoard
             status_label = rootVisualElement.Q<Label>("status_label");
             resolution_label = rootVisualElement.Q<Label>("resolution_label");
             export_button = rootVisualElement.Q<Button>("export_button");
-            prefab_button = rootVisualElement.Q<Button>("prefab_button");
 
             var font_field = rootVisualElement.Q<DropdownField>("font_field");
             try
@@ -65,8 +62,7 @@ namespace D9speed_BaseEditorUtils.GuideBoard
 
             bind<TextField, string>("text_field", settings.text, value => settings.text = value);
             rootVisualElement.Q<Button>("refresh_button").clicked += render_preview;
-            export_button.clicked += export_png;
-            prefab_button.clicked += export_prefab;
+            export_button.clicked += export_sprite;
             schedule_render();
         }
 
@@ -86,7 +82,6 @@ namespace D9speed_BaseEditorUtils.GuideBoard
         private void schedule_render()
         {
             export_button?.SetEnabled(false);
-            prefab_button?.SetEnabled(false);
             pending_render?.Pause();
             pending_render = rootVisualElement.schedule.Execute(render_preview).StartingIn(100);
         }
@@ -102,7 +97,6 @@ namespace D9speed_BaseEditorUtils.GuideBoard
             pending_render?.Pause();
             if (preview_image == null) return;
             export_button.SetEnabled(false);
-            prefab_button.SetEnabled(false);
             try
             {
                 resolution_label.text = "1024 × 512 px";
@@ -114,9 +108,8 @@ namespace D9speed_BaseEditorUtils.GuideBoard
                     set_status("文章が枠からはみ出しています。文章を短くしてください。", true);
                 else
                     set_status("フォント: " + (string.IsNullOrEmpty(settings.font_name) ? "自動" : settings.font_name) +
-                        "。PNGまたはEditorOnlyのプレハブを保存できます。");
+                        "。Sprite として保存できます。");
                 export_button.SetEnabled(true);
-                prefab_button.SetEnabled(true);
             }
             catch (Exception exception)
             {
@@ -128,49 +121,19 @@ namespace D9speed_BaseEditorUtils.GuideBoard
             }
         }
 
-        private void export_png()
+        private void export_sprite()
         {
             render_preview();
             if (preview == null || !export_button.enabledSelf) return;
             if (preview.text_overflows && !EditorUtility.DisplayDialog("文章が収まりません", "末尾が切れた状態で保存しますか？", "保存", "戻る")) return;
-            var target_path = EditorUtility.SaveFilePanel("説明画像を保存", last_save_directory, "guide_text", "png");
+            var target_path = EditorUtility.SaveFilePanelInProject("説明画像を Sprite として保存", "guide_text", "png", "Assets 内に Sprite 設定の PNG を保存します。同名の場合は連番で作成します。");
             if (string.IsNullOrEmpty(target_path)) return;
             try
             {
-                // SaveFilePanel supplies Unity/OS's overwrite confirmation.
-                File.WriteAllBytes(target_path, preview.encode_png());
-                last_save_directory = Path.GetDirectoryName(target_path);
-                var assets_directory = Path.GetFullPath(Application.dataPath) + Path.DirectorySeparatorChar;
-                var full_path = Path.GetFullPath(target_path);
-                if (full_path.StartsWith(assets_directory, StringComparison.OrdinalIgnoreCase))
-                {
-                    var asset_path = "Assets/" + full_path.Substring(assets_directory.Length).Replace('\\', '/');
-                    AssetDatabase.ImportAsset(asset_path, ImportAssetOptions.ForceSynchronousImport);
-                    guide_board_exporter.configure_texture(asset_path);
-                    EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<Texture2D>(asset_path));
-                }
-                set_status("保存しました: " + Path.GetFileName(target_path));
-            }
-            catch (Exception exception)
-            {
-                set_status("保存できませんでした: " + exception.Message, true);
-                Debug.LogException(exception);
-            }
-        }
-
-        private void export_prefab()
-        {
-            render_preview();
-            if (preview == null || !prefab_button.enabledSelf) return;
-            if (preview.text_overflows && !EditorUtility.DisplayDialog("文章が収まりません", "末尾が切れた状態で保存しますか？", "保存", "戻る")) return;
-            var target_path = EditorUtility.SaveFilePanelInProject("説明板プレハブを保存", "guide_board", "prefab", "PNG・マテリアル・EditorOnly のプレハブを同じフォルダーへ保存します。同名の場合は連番で作成します。");
-            if (string.IsNullOrEmpty(target_path)) return;
-            try
-            {
-                var prefab = guide_board_exporter.save_prefab(target_path, preview.encode_png());
-                Selection.activeObject = prefab;
-                EditorGUIUtility.PingObject(prefab);
-                set_status("保存しました: " + AssetDatabase.GetAssetPath(prefab));
+                var sprite = guide_board_exporter.save_sprite(target_path, preview.encode_png());
+                Selection.activeObject = sprite;
+                EditorGUIUtility.PingObject(sprite);
+                set_status("保存しました: " + AssetDatabase.GetAssetPath(sprite));
             }
             catch (Exception exception)
             {

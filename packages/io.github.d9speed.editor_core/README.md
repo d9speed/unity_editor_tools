@@ -3,11 +3,11 @@
 D9speedのEditor拡張が共有する補助処理と、普段使いの右クリックメニューです。オブジェクト検索、ヒューマノイド対応付け、階層パス、コンポーネントコピー、ファイル名の処理に加えて、Unity Utilityの各機能を収録します。
 
 - 対応基準: Unity 2022.3.22f1。
-- Editor専用。VRChat SDKは不要です。説明板の描画にはWindows用の同梱DLLを使用します。
+- Editor専用。VRChat SDKは不要です。説明画像の描画にはWindows用の同梱DLLを使用します。
 - アセンブリ名: `D9speed.EditorUtils`。
 - 名前空間: `D9speed_BaseEditorUtils`。
 
-説明板プレハブ作成は `D9speed.EditorUtils.GuideBoard` と `Renderer~/guide_board_renderer.dll` を使用します。DLLはWindows標準のフォント描画機能でPNGを生成します。TextMeshPro・TMP Essential Resources・別途インストールするフォントアセットは不要です。
+説明画像のSprite作成は `D9speed.EditorUtils.GuideBoard` と `Renderer~/guide_board_renderer.dll` を使用します。DLLはWindows標準のフォント描画機能でPNGを生成します。TextMeshPro・TMP Essential Resources・別途インストールするフォントアセットは不要です。
 
 `FindSceneObjects<T>()`は有効なシーンオブジェクトを取得します。`true`を渡すと非アクティブも含めます。`GetObjectId()`はEditorセッション内の識別子を返します。
 
@@ -26,7 +26,8 @@ D9speedのEditor拡張が共有する補助処理と、普段使いの右クリ�
 | Component／Hierarchyの右クリック → `コピーしたコンポーネントを新規貼り付け` | シーンオブジェクトへ追加。Undo対応 |
 | Hierarchyの右クリック → メインカメラ関連の2項目 | 対象へカメラを向ける／対象の+Z方向から正対。Undo対応 |
 | `D9speed > Transform Mirror Tool` | X軸方向のミラー複製。左右名・Constraint／PhysBone／Colliderの対称化と作成ペアの事前表示 |
-| `D9speed > Tools > 説明画像つき板ポリプレハブ作成(EditorOnly)` | 文章を画像にし、EditorOnlyのQuadプレハブとPNG・Unlitマテリアルを保存 |
+| `D9speed > Tools > 説明画像をSpriteで作成` | 文章を画像にし、Sprite設定のPNGを保存 |
+| `D9speed > Tools > liltoonマテリアルセットアップ` | FBXから抽出したマテリアルへ、名前が対応するテクスチャを一括設定 |
 | `Alt + R` | 選択したシーンオブジェクトのローカルTransformをリセット。Undo対応 |
 | `Ctrl + L`（macOSは`Cmd + L`） | Inspectorのロック／解除を切り替え |
 | Hierarchy | コンポーネントに変更があるPrefabインスタンスのルートへ変更マークを表示 |
@@ -62,24 +63,60 @@ VRChat SDKは必須依存にせず、導入されている場合に対応しま�
 
 アセット複製は既存のコピーを上書きせず、別名で作成します。参照置換はUnityのYAMLテキスト形式が対象です。選択範囲の外にある依存アセットは追加コピーせず、元の参照を維持します。バイナリ形式のアセット内の参照置換には対応しません。
 
-## 説明画像つき板ポリプレハブ
+## liltoonマテリアルセットアップ
 
-Unity 2022.3 / Windows用のEditor専用ツールです。画像生成にはWindowsのシステムフォントを使います。板ポリゴンのマテリアルはBuilt-in Render Pipelineの `Unlit/Texture` を使います。
+Unity 2022.3用のEditor拡張です。FBXのMaterialsからExtractした既存 `.mat` をそのまま更新し、モデルやPrefabからの参照を維持します。lilToonは別途導入してください。Editor Core自体にはlilToonの必須依存を追加していません。
 
-1. `D9speed/Tools/説明画像つき板ポリプレハブ作成(EditorOnly)` を開きます。
+1. `D9speed/Tools/liltoonマテリアルセットアップ` を開きます。
+2. Assets内のマテリアルフォルダとテクスチャフォルダを指定します。サブフォルダも検索します。
+3. 必要なら雛形のlilToonマテリアル、ノーマルの形式、AOの割り当て方法を指定します。
+4. 「割り当てを確認 / 更新」で対応と警告を確認し、対象行を選んで「一括セットアップ」を押します。
+
+`jacket.mat` に対して `jacket_BaseColor.png` などを検索します。大文字・小文字を区別せず、マテリアルのファイル名と用途の末尾名を完全一致で照合します。部分一致や連番の除去は行いません。同じ用途の画像が複数ある場合、そのマテリアル全体を対象外にします。FBX内蔵のマテリアルやPackages内のアセットは変更しません。
+
+| Painterでの末尾名 | lilToonの割り当て先 | インポート設定 |
+|---|---|---|
+| `_BaseColor` | メインカラー | sRGBオン |
+| `_NormalMap` | ノーマルマップ | Normal map、sRGBオフ |
+| `_MatCapMask` | MatCapのマスク | sRGBオフ |
+| `_Emission` | 発光テクスチャ | sRGBオン |
+| `_AOMap` | 下記の選択方式 | sRGBオフ |
+| `_Roughness` | 反転してSmoothnessに設定 | 元・生成画像ともsRGBオフ |
+| `_MatCap2` | MatCap 2ndのマスク | sRGBオフ |
+| `_NormalMap2` | ノーマルマップ2nd（任意） | Normal map、sRGBオフ |
+| `_NormalMap2Mask` | ノーマルマップ2ndの強度マスク | sRGBオフ |
+| `_RimLightMask` | リムライトの色 / マスク | sRGBオフ |
+
+Painter側はすべて `$textureSet_用途名` で書き出してください。例えば `textureSet_NormalMap2Mask` と固定文字列になっている場合は、先頭の `$` を補ってください。ノーマルは既定でOpenGLです。DirectXで書き出した場合は画面で選ぶと緑チャンネル反転を設定します。BaseColorにアルファがあっても透過方式は自動判定しません。
+
+雛形ありではそのシェーダーと全プロパティをコピーしてから画像を割り当てます。雛形自身は対象から除外します。雛形なしでは既存の通常版lilToon系シェーダーと設定を維持し、Liteを含むその他のマテリアルは不透明の `lilToon` へ変更してメイン色・テクスチャ・UVスケール／オフセットを引き継ぎます。見つからないマップは雛形または既存の設定を維持します。
+
+AOは「影設定のAO Map」（既定）、「メインカラー2ndに乗算」、「D9speed AO拡張」、「割り当てずsRGBのみオフ」から選べます。標準のAO Mapは影の付きやすさを制御し、RGBが影色1・2・3に対応します。メインカラー2ndへの乗算を選んだ際、別のテクスチャでそのレイヤーが使用中なら適用を止めます。D9speed AO拡張は対応シェーダーの既存材質または雛形が必要で、UV0・Rチャンネルで設定します。MatCapマスクからMatCap本体は生成しません。本体が未設定ならマスクだけを割り当て、機能を自動でオンにせず警告します。NormalMap2Maskのみの場合も同様です。
+
+Roughnessの変換はPNG / JPEG対応です。元画像のRを `1 - Roughness` で反転し、テクスチャフォルダの `_liltoon_generated` に別のPNGを作ります。元画像のピクセルは変更せず、インポート時の圧縮・縮小・ガンマ変換より前のデータから変換します。生成済み画像は再実行時に同じGUIDで更新します。Smoothnessの強度などは雛形または既存の設定に従います。
+
+適用前の `.mat` とテクスチャのインポート設定は `Library/d9_liltoon_material_setup` にバックアップします。「前回の設定を復元」で戻せますが、適用後に手動で加えた編集も戻るため、復元前に表示を確認してください。失敗時はその実行分を自動復元します。新規生成した画像は復元時に削除し、空になった生成フォルダは残します。Unityの通常のUndoとは別の復元機能です。Libraryを削除するとバックアップも失われます。
+
+インポート設定の変更は同じ画像を参照するほかのマテリアルにも反映されます。変更対象は対応が見つかり、選択したマテリアルで利用する画像だけです。
+
+## 説明画像をSpriteで作成
+
+Unity 2022.3 / Windows用のEditor専用ツールです。画像生成にはWindowsのシステムフォントを使います。
+
+1. `D9speed/Tools/説明画像をSpriteで作成` を開きます。
 2. Windowsに入っているフォントを選び、文章を入力します。「自動」ではメイリオを優先し、文章量に合わせて文字サイズを調整します。
-3. プレビューを確認して「プレハブを保存…」を押し、Assets内の保存先を選びます。
-4. 作成したプレハブを必要な場所に配置します。
+3. プレビューを確認して「Sprite を保存…」を押し、Assets内の保存先を選びます。
+4. 保存されたSpriteをシーンへ配置できます。必要に応じて配置したGameObjectに`EditorOnly`タグを付けます。
 
-同じフォルダーへ `.prefab`、`_image.png`、`_material.mat` を保存します。既存のアセットは上書きせず、同名の場合は連番を付けます。プレハブは `EditorOnly` タグ付き、ColliderなしのQuadで、高さ1 m・幅は画像の縦横比に合わせます。Unity標準のQuadと `Unlit/Texture` を使うため、正面はローカル-Z側です。シーンへ自動配置はしません。ビルドではEditorOnlyの説明板が除外されます。PNG単体の保存も可能です。
+出力はSpriteとしてインポートされた `.png` 1点です。マテリアル・Quad・プレハブは作成しません。既存のアセットは上書きせず、同名の場合は連番を付けます。Built-in Render PipelineのSpriteRendererは既定マテリアルでライトの影響を受けません。
 
-日本語の描画にはWindowsのシステムフォントを使います。フォント欄にはインストール済みの一覧が表示されます。「自動」でメイリオがない場合は既定のシステムフォントに切り替わります。描画結果をプレビューで確認してください。フォントファイルは配布物に含めません。作成されたプレハブはPNGとマテリアルだけを参照し、フォントや専用スクリプトを参照しません。
+日本語の描画にはWindowsのシステムフォントを使います。フォント欄にはインストール済みの一覧が表示されます。「自動」でメイリオがない場合は既定のシステムフォントに切り替わります。描画結果をプレビューで確認してください。フォントファイルは配布物に含めません。出力したSpriteはフォントや専用スクリプトを参照しません。
 
 - PNGは1024×512 px、白背景・濃い文字・40 px余白です。自動折り返し・改行に対応し、文字サイズを12〜48 pxで自動調整します。リッチテキストは解釈しません。
 - 最小サイズでも文字が収まらない場合は警告し、保存時に確認します。フォント不足時の代替字形はプレビューで確認してください。
 - 変更から100 ms後に描画します。Editor CoreはDLLから受け取ったPNGをプレビューに表示し、ウィンドウ終了時にテクスチャを解放します。
 - 共通UIのライト／ダーク・フォント設定を引き継ぎます。文章と選択フォントはスクリプトの再コンパイル時に保持しますが、文書やプリセットの永続保存はありません。
-- Assets内のPNGは無圧縮・sRGB・Mip Mapなし・Clampで保存します。透過PNGは対象外です。URP/HDRPでの板ポリゴン表示は検証対象外です。
+- Sprite設定はSingle・Full Rect・512 Pixels Per Unit・無圧縮・sRGB・Mip Mapなし・Clampです。1024×512 pxの画像は2×1 Unity単位になります。透過PNGは対象外です。
 
 ## 設定
 

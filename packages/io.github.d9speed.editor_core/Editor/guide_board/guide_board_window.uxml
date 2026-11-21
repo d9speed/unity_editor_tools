@@ -2,7 +2,7 @@
     <ui:Style src="guide_board_window.uss" />
     <ui:VisualElement name="guide_root" class="guide_root">
         <ui:VisualElement class="header">
-            <ui:Label text="説明画像つき板ポリプレハブ" class="heading" />
+            <ui:Label text="説明画像を Sprite として作成" class="heading" />
             <ui:Label text="文章を入力すると、システムフォントで説明画像を作成します" class="subtitle" />
         </ui:VisualElement>
         <ui:VisualElement class="body">
@@ -24,8 +24,7 @@
         </ui:VisualElement>
         <ui:VisualElement class="footer">
             <ui:Button name="refresh_button" text="再描画" />
-            <ui:Button name="export_button" text="PNG を保存…" class="export_button" />
-            <ui:Button name="prefab_button" text="プレハブを保存…" class="d9_button_primary" />
+            <ui:Button name="export_button" text="Sprite を保存…" class="d9_button_primary" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

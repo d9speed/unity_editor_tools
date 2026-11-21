@@ -1,0 +1,17 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:ScrollView name="setup_scroll" class="d9_scroll">
+        <ui:VisualElement class="d9_content">
+            <ui:VisualElement class="d9_header">
+                <ui:Label text="liltoon マテリアルセットアップ" class="d9_title" />
+                <ui:Label text="FBXから抽出したマテリアルに、Substance Painterのテクスチャをまとめて設定します。" class="d9_description" />
+            </ui:VisualElement>
+            <ui:VisualElement name="settings" class="d9_section" />
+            <ui:VisualElement name="options" class="d9_section" />
+            <ui:VisualElement name="scan_actions" class="d9_row" />
+            <ui:HelpBox name="status" message-type="Info" />
+            <ui:Label name="count" class="d9_section_title" />
+            <ui:VisualElement name="preview" />
+        </ui:VisualElement>
+    </ui:ScrollView>
+    <ui:VisualElement name="footer" class="d9_row setup_footer" />
+</ui:UXML>

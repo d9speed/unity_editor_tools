@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.15 - 2026-11-21
+
+- `D9speed/Tools/liltoonマテリアルセットアップ` を追加。FBXから抽出した既存 `.mat` とテクスチャフォルダを照合し、参照を維持して一括設定。
+- 割り当てプレビュー、行ごとの選択、重複候補・AOの既存レイヤー競合の検出、任意の雛形マテリアルに対応。
+- AOMap・Roughness・MatCapMask・MatCap2を含むマスクのsRGBをオフ、NormalMapをNormal map形式へ設定。OpenGL / DirectXを選択可能。
+- Roughnessの元画像を残してSmoothnessを生成。再実行時も生成画像のGUIDを維持。
+- マテリアルとインポート設定のバックアップ・復元、失敗時の自動復元を追加。lilToon未導入でもEditor Coreはコンパイル可能。
+
+## 0.1.14 - 2026-11-02
+
+- 説明画像をSprite設定のPNGだけとして保存するよう変更。マテリアル・Quad・プレハブの生成を廃止。
+- 保存先をAssets内に限定し、同名の画像は連番で作成。画像生成とWindowsシステムフォント選択は維持。
+
 ## 0.1.13 - 2026-09-28
 
 - Hierarchy検索に`bs:`フィルターを追加。`h:t:SkinnedMeshRenderer bs:smile`でコンポーネント種別とブレンドシェイプ名を組み合わせて検索できるようにした。従来の単独検索`bs:smile`も維持。
