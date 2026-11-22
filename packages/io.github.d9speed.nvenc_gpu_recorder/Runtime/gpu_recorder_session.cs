@@ -72,6 +72,7 @@ namespace D9speed.NvencGpu
         string failure = "";
         public string raw_path { get; }
         public string output_path => options.output_path;
+        internal Vector2Int output_size => new Vector2Int(options.width, options.height);
         public bool is_closed => id == 0;
         public string error => failure;
         public Task mux_task { get; private set; } = Task.CompletedTask;

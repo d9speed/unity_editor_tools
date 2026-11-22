@@ -58,7 +58,7 @@ namespace D9speed.PackageValidation
         {
             var package = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
                 .Single(p => p.name == "io.github.d9speed.nvenc_gpu_recorder");
-            require(package.version == "0.1.4", "Package version");
+            require(package.version == "0.1.5", "Package version");
             require(!new gpu_recorder_options().flip_vertical, "Vertical flip should default to off");
             require(!Directory.GetFiles(package.resolvedPath, "*.exe", SearchOption.AllDirectories).Any(), "Bundled executable");
             require(!Directory.Exists(Path.Combine(package.resolvedPath, "results~")), "Bundled recording results");

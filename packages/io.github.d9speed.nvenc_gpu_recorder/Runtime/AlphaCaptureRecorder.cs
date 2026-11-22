@@ -230,7 +230,7 @@ namespace D9speed.Recording
         {
             if (config.capture_game_view)
             {
-                using var frame = game_view_frame.capture();
+                using var frame = game_view_frame.capture_for_video(new Vector2Int(config.width, config.height));
                 BlitSource(frame.texture);
                 return;
             }

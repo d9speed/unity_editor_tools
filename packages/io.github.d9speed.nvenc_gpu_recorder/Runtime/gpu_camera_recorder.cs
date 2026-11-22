@@ -64,7 +64,7 @@ namespace D9speed.NvencGpu
                 if (!offline_mode) next = Math.Max(next + 1.0/options.fps,now);
                 try
                 {
-                    using var frame = capture_game_view ? game_view_frame.capture() : default;
+                    using var frame = capture_game_view ? game_view_frame.capture_for_video(session.output_size) : default;
                     var source = capture_game_view ? frame.texture : source_texture;
                     if (source == null)
                     {
