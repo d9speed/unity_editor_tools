@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using D9speed.NvencGpu;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -28,7 +29,7 @@ namespace D9speed.Recording
             public bool alpha;         // 背景を α0 の Solid Color でクリアして録画する
             public bool offline_mode;  // Time.captureFramerate 固定 + 同期読み戻し(取りこぼしゼロ・非リアルタイム)
             public bool force_ldr;     // 録画レンダリング時のみ HDR を無効化(アルファの安定用)
-            public bool flip_vertical; // 読み戻し前に GPU 側 Blit で上下反転する(D3D11 では通常 true)。
+            public bool flip_vertical; // 有効時のみ読み戻し前に GPU 側 Blit で上下反転する。
                                        // ffmpeg 側の vflip は Vulkan ProRes 経路をクラッシュさせるため使わない
             public int max_queue;      // パイプ前段のフレームキュー上限
         }
@@ -233,32 +234,7 @@ namespace D9speed.Recording
             }
             var cam = config.target_camera;
             if (cam == null) throw new InvalidOperationException("録画対象カメラが失われました。");
-            var prev_target = cam.targetTexture;
-            var prev_flags = cam.clearFlags;
-            var prev_bg = cam.backgroundColor;
-            bool prev_hdr = cam.allowHDR;
-            float prev_aspect = cam.aspect;
-
-            try
-            {
-                cam.targetTexture = render_rt;
-                if (config.alpha)
-                {
-                    cam.clearFlags = CameraClearFlags.SolidColor;
-                    cam.backgroundColor = Color.clear;
-                }
-                if (config.force_ldr) cam.allowHDR = false;
-
-                cam.Render();
-            }
-            finally
-            {
-                cam.targetTexture = prev_target;
-                cam.clearFlags = prev_flags;
-                cam.backgroundColor = prev_bg;
-                cam.allowHDR = prev_hdr;
-                cam.aspect = prev_aspect;
-            }
+            camera_capture_rendering.render_offscreen(cam, render_rt, config.alpha, config.force_ldr);
             BlitSource(render_rt);
         }
 

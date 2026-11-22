@@ -41,9 +41,7 @@ namespace D9speed.NvencGpu
                     camera_rt = new RenderTexture(options.width,options.height,24,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB)
                         {name="nvenc_camera_target",hideFlags=HideFlags.HideAndDontSave};
                     if (!camera_rt.Create()) throw new InvalidOperationException("録画用RenderTextureを作成できませんでした。");
-                    camera_capture_commands = new CommandBuffer { name = "d9_nvenc_camera_copy" };
-                    camera_capture_commands.Blit(BuiltinRenderTextureType.CameraTarget, camera_rt);
-                    camera_capture_source.AddCommandBuffer(CameraEvent.AfterEverything, camera_capture_commands);
+                    camera_capture_commands = camera_capture_rendering.attach_camera_copy(camera_capture_source, camera_rt);
                 }
                 session = new gpu_recorder_session(options);
             }
@@ -118,11 +116,7 @@ namespace D9speed.NvencGpu
                 var fallback_object = new GameObject("d9_nvenc_fallback_camera") { hideFlags = HideFlags.HideAndDontSave };
                 fallback_camera = fallback_object.AddComponent<Camera>();
             }
-            fallback_camera.CopyFrom(camera_capture_source);
-            fallback_camera.enabled = false;
-            fallback_camera.targetTexture = camera_rt;
-            fallback_camera.transform.SetPositionAndRotation(camera_capture_source.transform.position, camera_capture_source.transform.rotation);
-            fallback_camera.Render();
+            camera_capture_rendering.render_fallback(camera_capture_source, camera_rt, fallback_camera);
         }
         void OnDisable() { stop(); }
         void OnDestroy() { stop(); }

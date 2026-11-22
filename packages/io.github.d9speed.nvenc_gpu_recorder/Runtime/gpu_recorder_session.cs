@@ -16,7 +16,7 @@ namespace D9speed.NvencGpu
     public sealed class gpu_recorder_options
     {
         public int width = 1920, height = 1080, fps = 60, bitrate = 0, cq = 23, buffers = 8;
-        public bool flip_vertical = true;
+        public bool flip_vertical;
         public string ffmpeg_path, output_path;
     }
 

@@ -58,7 +58,8 @@ namespace D9speed.PackageValidation
         {
             var package = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
                 .Single(p => p.name == "io.github.d9speed.nvenc_gpu_recorder");
-            require(package.version == "0.1.2", "Package version");
+            require(package.version == "0.1.3", "Package version");
+            require(!new gpu_recorder_options().flip_vertical, "Vertical flip should default to off");
             require(!Directory.GetFiles(package.resolvedPath, "*.exe", SearchOption.AllDirectories).Any(), "Bundled executable");
             require(!Directory.Exists(Path.Combine(package.resolvedPath, "results~")), "Bundled recording results");
             var dll = Directory.GetFiles(Path.Combine(package.resolvedPath, "Plugins/x86_64"), "*.dll").Single();
@@ -95,7 +96,7 @@ namespace D9speed.PackageValidation
             var pattern = new Texture2D(2, 2, TextureFormat.RGB24, false) { filterMode = FilterMode.Point };
             require(source.Create(), "RenderTexture creation");
             var settings = new gpu_recorder_options { width = width, height = height, fps = fps,
-                bitrate = 8000000, cq = 0, ffmpeg_path = ffmpeg, output_path = output };
+                bitrate = 8000000, cq = 0, flip_vertical = true, ffmpeg_path = ffmpeg, output_path = output };
             try
             {
                 using (var session = new gpu_recorder_session(settings))

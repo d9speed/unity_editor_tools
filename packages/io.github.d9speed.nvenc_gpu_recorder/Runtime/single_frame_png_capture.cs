@@ -52,33 +52,7 @@ namespace D9speed.NvencGpu
                 {
                     if (target_camera == null) throw new InvalidOperationException("録画対象カメラが失われました。");
                     camera_rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-                    var previous_target = target_camera.targetTexture;
-                    var previous_flags = target_camera.clearFlags;
-                    var previous_background = target_camera.backgroundColor;
-                    var previous_hdr = target_camera.allowHDR;
-                    var previous_aspect = target_camera.aspect;
-                    try
-                    {
-                        target_camera.targetTexture = camera_rt;
-                        if (alpha)
-                        {
-                            target_camera.clearFlags = CameraClearFlags.SolidColor;
-                            target_camera.backgroundColor = Color.clear;
-                            target_camera.allowHDR = false;
-                        }
-                        target_camera.Render();
-                    }
-                    finally
-                    {
-                        if (target_camera != null)
-                        {
-                            target_camera.targetTexture = previous_target;
-                            target_camera.clearFlags = previous_flags;
-                            target_camera.backgroundColor = previous_background;
-                            target_camera.allowHDR = previous_hdr;
-                            target_camera.aspect = previous_aspect;
-                        }
-                    }
+                    camera_capture_rendering.render_offscreen(target_camera, camera_rt, alpha, alpha);
                     source = camera_rt;
                 }
                 if (!source.IsCreated()) throw new InvalidOperationException("入力RenderTextureが作成されていません。");

@@ -30,6 +30,9 @@ namespace D9speed.NvencGpu.Editor
         Task<prepared_prores> preparation;
         Task<string> png_task;
         Vector2 scroll;
+        readonly capture_range_preview preview = new capture_range_preview();
+        (int source, int width, int height, bool png, bool alpha) preview_settings;
+        string preview_error;
         bool recording => recorder != null && recorder.is_recording || alpha_recorder != null && alpha_recorder.IsRecording;
         bool finishing => png_task != null && !png_task.IsCompleted || recorder != null && !recorder.mux_task.IsCompleted;
         bool busy => recording || png_capture != null || preparation != null || finishing;
@@ -52,14 +55,28 @@ namespace D9speed.NvencGpu.Editor
         }
         void OnDisable()
         {
+            EditorApplication.delayCall -= take_preview;
+            preview.Dispose();
             stop(); prores_encoding.finish_exports();
             AssemblyReloadEvents.beforeAssemblyReload -= stop;
             EditorApplication.playModeStateChanged -= on_play_state;
             EditorApplication.quitting -= stop;
         }
-        void on_play_state(PlayModeStateChange value) { if (value == PlayModeStateChange.ExitingPlayMode) stop(); }
+        void on_play_state(PlayModeStateChange value)
+        {
+            if (value != PlayModeStateChange.ExitingPlayMode) return;
+            preview.Dispose();
+            preview_error = null;
+            stop();
+        }
         void Update()
         {
+            if (preview.waiting)
+            {
+                try { preview.poll(); }
+                catch (Exception e) { preview.Dispose(); preview_error = e.Message; }
+                if (!preview.waiting) Repaint();
+            }
             if (preparation != null && preparation.IsCompleted)
             {
                 var ready = preparation; preparation = null;
@@ -105,10 +122,10 @@ namespace D9speed.NvencGpu.Editor
             {
                 texture_source = (RenderTexture)EditorGUILayout.ObjectField("描画済み RenderTexture", texture_source, typeof(RenderTexture), false);
                 if (texture_source == null) camera_source = (Camera)EditorGUILayout.ObjectField("カメラ (Built-in)", camera_source, typeof(Camera), true);
-                options.width = EditorGUILayout.IntField("幅", options.width);
-                options.height = EditorGUILayout.IntField("高さ", options.height);
+                options.width = EditorGUILayout.IntField("出力幅 (px)", options.width);
+                options.height = EditorGUILayout.IntField("出力高さ (px)", options.height);
                 using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
-                    if (GUILayout.Button("キャプチャサイズをGame Viewに合わせる")) match_game_view_size();
+                    if (GUILayout.Button("出力解像度をGame Viewに合わせる")) match_game_view_size();
                 if (mode == capture_mode.single_frame_png)
                     png_alpha = EditorGUILayout.Toggle("透過背景", png_alpha);
                 else
@@ -135,6 +152,7 @@ namespace D9speed.NvencGpu.Editor
                 }
                 output_directory = EditorGUILayout.TextField("出力フォルダー", output_directory);
             }
+            draw_preview();
             if (!EditorApplication.isPlaying) EditorGUILayout.HelpBox("Playモードで録画を開始してください。", MessageType.None);
             if (mode == capture_mode.seconds) EditorGUILayout.HelpBox("録画秒数 × FPSのフレーム数で自動停止します。", MessageType.None);
             if (mode != capture_mode.single_frame_png && with_alpha) EditorGUILayout.HelpBox("ProResは大容量です。VulkanのMOVはプリマルチプライド、CPUはストレートアルファ。PNG出力時にストレートへ変換します。", MessageType.None);
@@ -169,6 +187,7 @@ namespace D9speed.NvencGpu.Editor
         void start()
         {
             if (this == null || busy || !EditorApplication.isPlaying) return;
+            preview.Dispose();
             try
             {
                 if (gpu_recorder_session.active_sessions != 0 || AlphaCaptureRecorder.ActiveSessions != 0)
@@ -229,6 +248,57 @@ namespace D9speed.NvencGpu.Editor
         }
         public sealed class prepared_prores { public string executable, note; public bool vulkan; }
         Camera source_camera => camera_source != null ? camera_source : Camera.main;
+
+        (int source, int width, int height, bool png, bool alpha) current_preview_settings()
+        {
+            UnityEngine.Object source = texture_source != null ? (UnityEngine.Object)texture_source : source_camera;
+            bool png = mode == capture_mode.single_frame_png;
+            return (source != null ? source.GetInstanceID() : 0, options.width, options.height, png, png ? png_alpha : with_alpha);
+        }
+
+        void draw_preview()
+        {
+            var settings = current_preview_settings();
+            if (!settings.Equals(preview_settings))
+            {
+                preview.Dispose();
+                preview_error = null;
+                preview_settings = settings;
+            }
+            EditorGUILayout.LabelField("録画範囲プレビュー", EditorStyles.boldLabel);
+            var camera = source_camera;
+            string input = texture_source != null ? $"RenderTexture「{texture_source.name}」全体"
+                : camera != null ? $"カメラ「{camera.name}」" + (camera_source == null ? "（自動）" : "")
+                : "カメラまたはRenderTextureを指定してください。";
+            EditorGUILayout.LabelField("録画元", input);
+            if (settings.width > 0 && settings.height > 0)
+                EditorGUILayout.LabelField("出力", $"{settings.width} × {settings.height} px");
+            using (new EditorGUI.DisabledScope(busy || preview.waiting || !EditorApplication.isPlaying || settings.source == 0))
+                if (GUILayout.Button(preview.image == null ? "プレビューを取得" : "プレビューを更新"))
+                    EditorApplication.delayCall += take_preview;
+            if (preview.waiting) EditorGUILayout.LabelField("カメラの次の描画を待っています…");
+            if (!string.IsNullOrEmpty(preview_error)) EditorGUILayout.HelpBox(preview_error, MessageType.Warning);
+            if (preview.image == null) return;
+            Rect area = GUILayoutUtility.GetRect(1, 156, GUILayout.ExpandWidth(true));
+            if (Event.current.type != EventType.Repaint) return;
+            EditorGUI.DrawRect(area, new Color(.12f, .12f, .12f));
+            float scale = Mathf.Min((area.width - 4) / settings.width, (area.height - 4) / settings.height);
+            Vector2 size = new Vector2(settings.width, settings.height) * scale;
+            Rect frame = new Rect(area.center - size / 2, size);
+            EditorGUI.DrawRect(new Rect(frame.x - 1, frame.y - 1, frame.width + 2, frame.height + 2), Color.gray);
+            EditorGUI.DrawRect(frame, Color.black);
+            GUI.DrawTextureWithTexCoords(frame, preview.image, preview.image_uv(options.flip_vertical), settings.alpha);
+        }
+
+        void take_preview()
+        {
+            if (this == null || !EditorApplication.isPlaying || busy) return;
+            preview_settings = current_preview_settings();
+            preview_error = null;
+            try { preview.capture(source_camera, texture_source, options.width, options.height, preview_settings.png, preview_settings.alpha); }
+            catch (Exception e) { preview.Dispose(); preview_error = e.Message; }
+            Repaint();
+        }
         string make_output(string prefix, string suffix) => Path.Combine(Path.GetFullPath(output_directory), prefix + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + suffix);
         static T create_recorder<T>() where T : Component => new GameObject("d9_capture") { hideFlags = HideFlags.DontSave }.AddComponent<T>();
         int frame_limit()
