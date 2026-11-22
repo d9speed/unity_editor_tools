@@ -21,6 +21,7 @@ namespace D9speed.Recording
         {
             public Camera target_camera;
             public RenderTexture source_texture;
+            public bool capture_game_view;
             public bool manual_capture; // 描画後に CaptureFrame() を明示的に呼ぶ場合。
             public int width;
             public int height;
@@ -69,8 +70,9 @@ namespace D9speed.Recording
         public void StartRecording(Config cfg, string ffmpeg_path, string ffmpeg_args, string output_path)
         {
             if (IsRecording) throw new InvalidOperationException("既に録画中です");
-            if (cfg.target_camera == null && cfg.source_texture == null) throw new ArgumentException("カメラまたはRenderTextureを指定してください。");
-            if (cfg.source_texture == null && GraphicsSettings.currentRenderPipeline != null)
+            bool use_camera = !cfg.capture_game_view && cfg.source_texture == null;
+            if (use_camera && cfg.target_camera == null) throw new ArgumentException("カメラまたはRenderTextureを指定してください。");
+            if (use_camera && GraphicsSettings.currentRenderPipeline != null)
                 throw new NotSupportedException("URP/HDRPでは描画済みRenderTextureを指定してください。");
             if (cfg.width < 16 || cfg.height < 16 || cfg.width % 2 != 0 || cfg.height % 2 != 0 || cfg.fps < 1 || cfg.fps > 240)
                 throw new ArgumentException("幅・高さは16以上の偶数、FPSは1～240を指定してください。");
@@ -87,7 +89,7 @@ namespace D9speed.Recording
             int frame_size = checked(cfg.width * cfg.height * 4);
             try
             {
-                if (!use_source_texture) render_rt = CreateRt(24, Mathf.Max(1, QualitySettings.antiAliasing));
+                if (use_camera) render_rt = CreateRt(24, Mathf.Max(1, QualitySettings.antiAliasing));
                 resolve_rt = CreateRt(0, 1);
                 session = new FfmpegPipeSession(ffmpeg_path, ffmpeg_args, frame_size, cfg.max_queue);
             }
@@ -226,6 +228,12 @@ namespace D9speed.Recording
 
         void RenderToCaptureRt()
         {
+            if (config.capture_game_view)
+            {
+                using var frame = game_view_frame.capture();
+                BlitSource(frame.texture);
+                return;
+            }
             if (use_source_texture)
             {
                 if (config.source_texture == null || !config.source_texture.IsCreated()) throw new InvalidOperationException("入力RenderTextureが失われたか作成されていません。");

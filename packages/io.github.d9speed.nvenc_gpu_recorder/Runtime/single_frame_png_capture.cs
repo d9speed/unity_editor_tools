@@ -11,6 +11,7 @@ namespace D9speed.NvencGpu
     {
         public Camera target_camera;
         public RenderTexture source_texture;
+        public bool capture_game_view;
         public int width, height;
         public bool alpha, flip_vertical;
         public string output_path;
@@ -19,9 +20,10 @@ namespace D9speed.NvencGpu
 
         public void begin()
         {
-            if (source_texture == null && target_camera == null)
+            bool use_camera = !capture_game_view && source_texture == null;
+            if (use_camera && target_camera == null)
                 throw new ArgumentException("カメラまたはRenderTextureを指定してください。");
-            if (source_texture == null && GraphicsSettings.currentRenderPipeline != null)
+            if (use_camera && GraphicsSettings.currentRenderPipeline != null)
                 throw new NotSupportedException("URP/HDRPでは描画済みRenderTextureを指定してください。");
             if (width < 1 || height < 1) throw new ArgumentException("PNGの幅・高さは1以上にしてください。");
             if (File.Exists(output_path)) throw new IOException("出力ファイルが既に存在します: " + output_path);
@@ -47,7 +49,8 @@ namespace D9speed.NvencGpu
             var previous_active = RenderTexture.active;
             try
             {
-                RenderTexture source = source_texture;
+                using var frame = capture_game_view ? game_view_frame.capture() : default;
+                RenderTexture source = capture_game_view ? frame.texture : source_texture;
                 if (source == null)
                 {
                     if (target_camera == null) throw new InvalidOperationException("録画対象カメラが失われました。");
@@ -58,7 +61,9 @@ namespace D9speed.NvencGpu
                 if (!source.IsCreated()) throw new InvalidOperationException("入力RenderTextureが作成されていません。");
 
                 output_rt = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-                if (flip_vertical)
+                // ScreenCapture supplies native screen rows; PNG ReadPixels uses bottom-left coordinates.
+                bool screen_starts_at_top = capture_game_view && SystemInfo.graphicsUVStartsAtTop;
+                if (flip_vertical != screen_starts_at_top)
                     Graphics.Blit(source, output_rt, new Vector2(1f, -1f), new Vector2(0f, 1f));
                 else
                     Graphics.Blit(source, output_rt);

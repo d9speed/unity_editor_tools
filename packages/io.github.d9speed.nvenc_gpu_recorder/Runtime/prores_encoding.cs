@@ -18,11 +18,15 @@ namespace D9speed.Recording
         static readonly List<Task> exports = new List<Task>();
 
         public static string arguments(int width, int height, int fps, bool vulkan, string output)
+            => arguments(width, height, fps, vulkan, output, false);
+
+        internal static string arguments(int width, int height, int fps, bool vulkan, string output, bool opaque)
         {
             string device = vulkan ? vulkan_device : "";
             string filter = vulkan ? vulkan_filter : "format=yuva444p10le";
             string codec = vulkan ? vulkan_codec : "-c:v prores_ks -profile:v 4444 -alpha_bits 16";
-            return $"-hide_banner -n {device}-f rawvideo -pixel_format rgba -video_size {width}x{height} -framerate {fps} -i - " +
+            string input_format = opaque ? "rgb0" : "rgba";
+            return $"-hide_banner -n {device}-f rawvideo -pixel_format {input_format} -video_size {width}x{height} -framerate {fps} -i - " +
                    $"-an -vf \"{filter}\" {codec} {quote(output)}";
         }
 

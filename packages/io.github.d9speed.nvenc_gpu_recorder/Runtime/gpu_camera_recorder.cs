@@ -11,6 +11,7 @@ namespace D9speed.NvencGpu
     {
         public Camera target_camera;
         public RenderTexture source_texture;
+        public bool capture_game_view;
         public gpu_recorder_options options = new gpu_recorder_options();
         [Tooltip("ゲーム時間を録画FPSに固定します。実時間の録画ではオフにしてください。")]
         public bool offline_mode;
@@ -30,12 +31,13 @@ namespace D9speed.NvencGpu
         public void begin()
         {
             if (is_recording || (session != null && !session.is_closed)) throw new InvalidOperationException("既に録画中です。");
-            if (source_texture == null && target_camera == null) throw new InvalidOperationException("カメラまたはRenderTextureを指定してください。");
-            if (source_texture == null && GraphicsSettings.currentRenderPipeline != null)
+            bool use_camera = !capture_game_view && source_texture == null;
+            if (use_camera && target_camera == null) throw new InvalidOperationException("カメラまたはRenderTextureを指定してください。");
+            if (use_camera && GraphicsSettings.currentRenderPipeline != null)
                 throw new NotSupportedException("URP/HDRPでは描画済みRenderTextureを指定してください。");
             try
             {
-                if (source_texture == null)
+                if (use_camera)
                 {
                     camera_capture_source = target_camera;
                     camera_rt = new RenderTexture(options.width,options.height,24,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB)
@@ -62,7 +64,8 @@ namespace D9speed.NvencGpu
                 if (!offline_mode) next = Math.Max(next + 1.0/options.fps,now);
                 try
                 {
-                    var source = source_texture;
+                    using var frame = capture_game_view ? game_view_frame.capture() : default;
+                    var source = capture_game_view ? frame.texture : source_texture;
                     if (source == null)
                     {
                         if (camera_capture_source == null) throw new InvalidOperationException("録画カメラが破棄されました。");

@@ -11,6 +11,7 @@ namespace D9speed.NvencGpu.Editor
     public sealed class gpu_recorder_window : EditorWindow
     {
         enum capture_mode { manual, single_frame_png, seconds, frames }
+        enum recording_source { game_view, camera_or_texture }
         const string key = "d9_nvenc_gpu_";
         const string window_title = "FFmpeg Recorder";
         [SerializeField] Camera camera_source;
@@ -21,12 +22,15 @@ namespace D9speed.NvencGpu.Editor
         [SerializeField] bool png_alpha = true;
         [SerializeField] bool prefer_vulkan = true;
         [SerializeField] capture_mode mode;
+        [SerializeField] recording_source input;
         [SerializeField] float duration_seconds = 5f;
         [SerializeField] int duration_frames = 300;
         gpu_camera_recorder recorder;
         AlphaCaptureRecorder alpha_recorder;
         single_frame_png_capture png_capture;
         int recording_max_frames;
+        Vector2Int recording_size;
+        bool game_view => input == recording_source.game_view;
         Task<prepared_prores> preparation;
         Task<string> png_task;
         Vector2 scroll;
@@ -86,7 +90,7 @@ namespace D9speed.NvencGpu.Editor
             }
             if (png_task != null && png_task.IsCompleted)
             {
-                try { status = "MOV・透過PNGの保存完了: " + png_task.GetAwaiter().GetResult(); }
+                try { status = "MOV・PNGの保存完了: " + png_task.GetAwaiter().GetResult(); }
                 catch (Exception e) { fail(e); }
                 png_task = null;
                 Repaint();
@@ -112,22 +116,36 @@ namespace D9speed.NvencGpu.Editor
             {
                 using (new EditorGUI.DisabledScope(busy))
                     with_alpha = EditorGUILayout.Popup("出力形式", with_alpha ? 1 : 0,
-                        new[] { "HEVC / MP4（アルファなし）", "ProRes 4444 / MOV（アルファ付き）" }) == 1;
+                        new[] { "HEVC / MP4（アルファなし）", game_view ? "ProRes 4444 / MOV" : "ProRes 4444 / MOV（アルファ付き）" }) == 1;
                 EditorGUILayout.HelpBox(with_alpha
-                    ? "透過背景をMOVに保存します。Vulkanが使えない場合はCPUへ切り替えます。画像はCPUへの読み戻しを経由します。音声なし。"
+                    ? "ProRes 4444でMOVに保存します。Vulkanが使えない場合はCPUへ切り替えます。音声なし。"
                     : "NVIDIA / D3D11専用。画像をGPU内でNVENCへ渡し、停止後にMP4へ格納します。アルファなし・音声なし。", MessageType.Info);
             }
             EditorGUILayout.LabelField(SystemInfo.graphicsDeviceName);
             using (new EditorGUI.DisabledScope(busy))
             {
-                texture_source = (RenderTexture)EditorGUILayout.ObjectField("描画済み RenderTexture", texture_source, typeof(RenderTexture), false);
-                if (texture_source == null) camera_source = (Camera)EditorGUILayout.ObjectField("カメラ (Built-in)", camera_source, typeof(Camera), true);
-                options.width = EditorGUILayout.IntField("出力幅 (px)", options.width);
-                options.height = EditorGUILayout.IntField("出力高さ (px)", options.height);
-                using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
-                    if (GUILayout.Button("出力解像度をGame Viewに合わせる")) match_game_view_size();
+                EditorGUI.BeginChangeCheck();
+                input = (recording_source)EditorGUILayout.Popup("録画元", (int)input, new[] { "Game View", "カメラ / RenderTexture" });
+                if (EditorGUI.EndChangeCheck()) { preview.Dispose(); preview_error = null; }
+                if (game_view)
+                {
+                    Vector2Int size = busy ? recording_size : game_view_size();
+                    EditorGUILayout.LabelField("出力解像度", EditorApplication.isPlaying ? $"{size.x} × {size.y} px" : "Playモードで自動取得");
+                    EditorGUILayout.HelpBox("Game Viewに表示されたゲーム画面全体を、UIも含めて保存します。", MessageType.None);
+                }
+                else
+                {
+                    texture_source = (RenderTexture)EditorGUILayout.ObjectField("描画済み RenderTexture", texture_source, typeof(RenderTexture), false);
+                    if (texture_source == null) camera_source = (Camera)EditorGUILayout.ObjectField("カメラ (Built-in)", camera_source, typeof(Camera), true);
+                    options.width = EditorGUILayout.IntField("出力幅 (px)", options.width);
+                    options.height = EditorGUILayout.IntField("出力高さ (px)", options.height);
+                    using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
+                        if (GUILayout.Button("出力解像度をGame Viewに合わせる")) match_game_view_size();
+                }
                 if (mode == capture_mode.single_frame_png)
-                    png_alpha = EditorGUILayout.Toggle("透過背景", png_alpha);
+                {
+                    if (!game_view) png_alpha = EditorGUILayout.Toggle("透過背景", png_alpha);
+                }
                 else
                 {
                     options.fps = EditorGUILayout.IntField("FPS", options.fps);
@@ -136,7 +154,7 @@ namespace D9speed.NvencGpu.Editor
                     if (with_alpha)
                     {
                         prefer_vulkan = EditorGUILayout.Toggle("Vulkanを優先", prefer_vulkan);
-                        export_png = EditorGUILayout.Toggle("停止後に透過PNG連番も出力", export_png);
+                        export_png = EditorGUILayout.Toggle(game_view ? "停止後にPNG連番も出力" : "停止後に透過PNG連番も出力", export_png);
                     }
                     else
                     {
@@ -152,10 +170,10 @@ namespace D9speed.NvencGpu.Editor
                 }
                 output_directory = EditorGUILayout.TextField("出力フォルダー", output_directory);
             }
-            draw_preview();
+            if (!game_view) draw_preview();
             if (!EditorApplication.isPlaying) EditorGUILayout.HelpBox("Playモードで録画を開始してください。", MessageType.None);
             if (mode == capture_mode.seconds) EditorGUILayout.HelpBox("録画秒数 × FPSのフレーム数で自動停止します。", MessageType.None);
-            if (mode != capture_mode.single_frame_png && with_alpha) EditorGUILayout.HelpBox("ProResは大容量です。VulkanのMOVはプリマルチプライド、CPUはストレートアルファ。PNG出力時にストレートへ変換します。", MessageType.None);
+            if (!game_view && mode != capture_mode.single_frame_png && with_alpha) EditorGUILayout.HelpBox("ProResは大容量です。VulkanのMOVはプリマルチプライド、CPUはストレートアルファ。PNG出力時にストレートへ変換します。", MessageType.None);
             using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying || busy))
                 if (GUILayout.Button(mode == capture_mode.single_frame_png ? "PNGを保存" : "録画開始")) EditorApplication.delayCall += start;
             if (mode != capture_mode.single_frame_png)
@@ -176,13 +194,17 @@ namespace D9speed.NvencGpu.Editor
             }
             if (!string.IsNullOrEmpty(status)) EditorGUILayout.HelpBox(status, MessageType.None);
             using (new EditorGUI.DisabledScope(busy || string.IsNullOrEmpty(last_movie) || !File.Exists(last_movie)))
-                if (GUILayout.Button("直前のMOVから透過PNG連番を出力")) begin_png();
+                if (GUILayout.Button("直前のMOVからPNG連番を出力")) begin_png();
             if (GUILayout.Button("出力フォルダーを開く"))
             {
                 try { Directory.CreateDirectory(output_directory); EditorUtility.RevealInFinder(output_directory); }
                 catch (Exception e) { fail(e); }
             }
             EditorGUILayout.EndScrollView();
+        }
+        void OnInspectorUpdate()
+        {
+            if (game_view && EditorApplication.isPlaying && !busy) Repaint();
         }
         void start()
         {
@@ -192,23 +214,26 @@ namespace D9speed.NvencGpu.Editor
             {
                 if (gpu_recorder_session.active_sessions != 0 || AlphaCaptureRecorder.ActiveSessions != 0)
                     throw new InvalidOperationException("他の録画を停止してから開始してください。");
-                if (texture_source == null && camera_source == null && Camera.main == null)
+                if (!game_view && texture_source == null && source_camera == null)
                     throw new ArgumentException("カメラまたはRenderTextureを指定してください。");
+                recording_size = game_view ? game_view_size() : new Vector2Int(options.width, options.height);
+                int width = recording_size.x, height = recording_size.y;
                 if (mode == capture_mode.single_frame_png)
                 {
-                    if (options.width < 1 || options.height < 1) throw new ArgumentException("PNGの幅・高さは1以上にしてください。");
+                    if (width < 1 || height < 1) throw new ArgumentException("PNGの幅・高さは1以上にしてください。");
                     clear_recorders();
                     png_capture = create_recorder<single_frame_png_capture>();
                     png_capture.target_camera = source_camera; png_capture.source_texture = texture_source;
-                    png_capture.width = options.width; png_capture.height = options.height;
-                    png_capture.alpha = png_alpha; png_capture.flip_vertical = options.flip_vertical;
+                    png_capture.capture_game_view = game_view;
+                    png_capture.width = width; png_capture.height = height;
+                    png_capture.alpha = !game_view && png_alpha; png_capture.flip_vertical = options.flip_vertical;
                     png_capture.output_path = make_output("frame_", ".png");
                     png_capture.finished += on_png_finished;
                     png_capture.begin(); status = "次の描画フレームをPNGに保存中…";
                     Repaint();
                     return;
                 }
-                if (options.width < 16 || options.height < 16 || options.width % 2 != 0 || options.height % 2 != 0 || options.fps < 1 || options.fps > 240)
+                if (width < 16 || height < 16 || width % 2 != 0 || height % 2 != 0 || options.fps < 1 || options.fps > 240)
                     throw new ArgumentException("幅・高さは16以上の偶数、FPSは1～240を指定してください。");
                 recording_max_frames = frame_limit();
                 if (!File.Exists(current_ffmpeg)) throw new FileNotFoundException("ffmpeg.exeを指定してください。");
@@ -218,17 +243,20 @@ namespace D9speed.NvencGpu.Editor
                 EditorPrefs.SetString(key+"output", output_directory);
                 if (with_alpha)
                 {
-                    string exe = current_ffmpeg; int width = options.width, height = options.height;
+                    string exe = current_ffmpeg;
                     bool vulkan = prefer_vulkan;
                     status = "ProResの動作を確認しています…";
                     preparation = Task.Run(() => prepare_alpha(exe, width, height, vulkan));
                 }
                 else
                 {
-                    options.output_path = make_output("gpu_", ".mp4");
                     recorder = create_recorder<gpu_camera_recorder>();
                     recorder.target_camera = source_camera; recorder.source_texture = texture_source;
-                    recorder.options = options; recorder.offline_mode = offline; recorder.max_frames = recording_max_frames;
+                    recorder.capture_game_view = game_view;
+                    recorder.options = JsonUtility.FromJson<gpu_recorder_options>(JsonUtility.ToJson(options));
+                    recorder.options.width = width; recorder.options.height = height;
+                    recorder.options.output_path = make_output("gpu_", ".mp4");
+                    recorder.offline_mode = offline; recorder.max_frames = recording_max_frames;
                     recorder.begin(); status = "録画中: HEVC / GPU直接入力";
                 }
             }
@@ -292,7 +320,7 @@ namespace D9speed.NvencGpu.Editor
 
         void take_preview()
         {
-            if (this == null || !EditorApplication.isPlaying || busy) return;
+            if (this == null || game_view || !EditorApplication.isPlaying || busy) return;
             preview_settings = current_preview_settings();
             preview_error = null;
             try { preview.capture(source_camera, texture_source, options.width, options.height, preview_settings.png, preview_settings.alpha); }
@@ -315,11 +343,16 @@ namespace D9speed.NvencGpu.Editor
             if (frames > int.MaxValue) throw new ArgumentException("録画秒数が長すぎます。");
             return Math.Max(1, (int)frames);
         }
+        Vector2Int game_view_size()
+        {
+            return mode == capture_mode.single_frame_png ? new Vector2Int(Screen.width, Screen.height)
+                : new Vector2Int(Screen.width & ~1, Screen.height & ~1);
+        }
         void match_game_view_size()
         {
             int game_width = Screen.width, game_height = Screen.height;
-            int width = game_width, height = game_height;
-            if (mode != capture_mode.single_frame_png) { width &= ~1; height &= ~1; }
+            var size = game_view_size();
+            int width = size.x, height = size.y;
             int minimum = mode == capture_mode.single_frame_png ? 1 : 16;
             if (width < minimum || height < minimum) { status = "Game Viewのサイズが録画可能な範囲より小さいです。"; return; }
             options.width = width; options.height = height;
@@ -341,10 +374,11 @@ namespace D9speed.NvencGpu.Editor
                 alpha_recorder = create_recorder<AlphaCaptureRecorder>();
                 alpha_recorder.Finished += on_alpha_finished;
                 alpha_recorder.StartRecording(new AlphaCaptureRecorder.Config {
-                    target_camera = source_camera, source_texture = texture_source, width = options.width, height = options.height,
+                    capture_game_view = game_view, target_camera = source_camera, source_texture = texture_source,
+                    width = recording_size.x, height = recording_size.y,
                     fps = options.fps, max_frames = recording_max_frames, alpha = true, offline_mode = offline,
                     force_ldr = true, flip_vertical = options.flip_vertical, max_queue = 8
-                }, prepared.executable, prores_encoding.arguments(options.width, options.height, options.fps, prepared.vulkan, last_movie), last_movie);
+                }, prepared.executable, prores_encoding.arguments(recording_size.x, recording_size.y, options.fps, prepared.vulkan, last_movie, game_view), last_movie);
                 status = "録画中: ProRes 4444 / " + prepared.note;
             }
             catch (Exception e) { clear_recorders(); fail(e); }
