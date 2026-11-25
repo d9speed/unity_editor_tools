@@ -63,6 +63,7 @@ public static class DisplayChildNamesInScene
     private const string session_key_enable_bone_sphere_click_selection = session_key_prefix + "enable_bone_sphere_click_selection";
     private const string session_key_bone_sphere_size = session_key_prefix + "bone_sphere_size";
     private const string session_key_show_humanoid_capsules = session_key_prefix + "show_humanoid_capsules";
+    private const string session_key_enable_humanoid_capsule_click_selection = session_key_prefix + "enable_humanoid_capsule_click_selection";
     private const string session_key_humanoid_capsule_thickness = session_key_prefix + "humanoid_capsule_thickness";
 
     private const float default_cursor_radius_pixels = 80f;
@@ -75,9 +76,14 @@ public static class DisplayChildNamesInScene
     private const float max_humanoid_capsule_thickness = 0.5f;
     private const int humanoid_capsule_arc_segments = 10;
     private static readonly Vector3[] humanoid_capsule_points = new Vector3[(humanoid_capsule_arc_segments + 1) * 2 + 1];
-    private static readonly Color humanoid_capsule_left_color = new Color(0.35f, 0.65f, 1f, 0.85f);
-    private static readonly Color humanoid_capsule_right_color = new Color(1f, 0.45f, 0.4f, 0.85f);
-    private static readonly Color humanoid_capsule_center_color = new Color(1f, 0.85f, 0.3f, 0.85f);
+    private static readonly Vector2[] humanoid_capsule_gui_points = new Vector2[(humanoid_capsule_arc_segments + 1) * 2 + 1];
+    private const float humanoid_capsule_pick_padding_pixels = 4f;
+    private static readonly int humanoid_capsule_control_hash = "DisplayChildNamesInSceneHumanoidCapsule".GetHashCode();
+    private const float humanoid_capsule_line_width = 3.5f;
+    private const float humanoid_capsule_highlight_width = 5f;
+    private static readonly Color humanoid_capsule_left_color = new Color(0.15f, 0.55f, 1f, 1f);
+    private static readonly Color humanoid_capsule_right_color = new Color(1f, 0.25f, 0.2f, 1f);
+    private static readonly Color humanoid_capsule_center_color = new Color(1f, 0.78f, 0.05f, 1f);
     private static readonly Vector2 default_gui_offset = new Vector2(0, 20);
     private const int default_font_size = 14;
     private static readonly Color default_label_color = Color.white;
@@ -249,7 +255,9 @@ public static class DisplayChildNamesInScene
         public Vector2 mouse_position;
         public int active_control_id;
         public Transform active_bone;
+        public bool active_is_capsule;
         public Transform candidate_bone;
+        public Transform candidate_humanoid_capsule;
         public Vector2 mouse_down_position;
         public bool dragged;
         public bool cancel_requested;
@@ -303,12 +311,14 @@ public static class DisplayChildNamesInScene
     private static bool show_bone_spheres = true;
     private static bool show_bone_hierarchy = true;
     private static bool show_humanoid_capsules = false;
+    private static bool enable_humanoid_capsule_click_selection = true;
     private static float humanoid_capsule_thickness = default_humanoid_capsule_thickness;
     private static bool show_bone_spheres_near_cursor_only = true;
     private static bool enable_bone_sphere_click_selection = false;
     private static Dictionary<Transform, List<Component>> phys_bone_root_reference_cache = new Dictionary<Transform, List<Component>>();
     private static bool phys_bone_root_reference_cache_dirty = true;
     private static Transform pending_delayed_bone_sphere_selection = null;
+    private static bool pending_selection_is_capsule;
     
     // マウスカーソル周辺とみなす半径（GUIピクセル単位）
     private static float cursor_radius_pixels = default_cursor_radius_pixels;
@@ -358,6 +368,7 @@ public static class DisplayChildNamesInScene
         // Visible bone count can no longer change the IDs of later Scene GUI controls.
         int sphere_control_id = GUIUtility.GetControlID(bone_sphere_button_hash, FocusType.Passive);
         int column_label_control_id = GUIUtility.GetControlID(column_label_control_hash, FocusType.Passive);
+        int capsule_control_id = GUIUtility.GetControlID(humanoid_capsule_control_hash, FocusType.Passive);
         SceneViewState state = GetSceneViewState(sceneView);
         // Disabled means no input tracking, camera inspection, picking or repaint requests.
         // Only release captures that this view already owns.
@@ -388,8 +399,9 @@ public static class DisplayChildNamesInScene
 
             // Rendering is not gated by another tool's hotControl.
             draw_bone_hierarchy(sceneView, state);
-            draw_humanoid_capsules(sceneView, state);
             DrawBoneSpheres(sceneView, state, sphere_control_id);
+            handle_humanoid_capsule_input(sceneView, state, e, capsule_control_id, EditorWindow.mouseOverWindow == sceneView);
+            draw_humanoid_capsules(sceneView, state, capsule_control_id);
 
             Handles.BeginGUI();
             try
@@ -645,9 +657,11 @@ public static class DisplayChildNamesInScene
         }
 
         bool escape = e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape;
-        if (!isEnabled || !show_bone_spheres || !enable_bone_sphere_click_selection ||
-            state.cancel_requested || state.active_bone == null ||
-            e.type == EventType.Ignore || escape)
+        if (!is_bone_click_selection_enabled(state.active_is_capsule) ||
+            state.cancel_requested || !is_visible_transform(state.active_bone) ||
+            (state.active_is_capsule && SceneVisibilityManager.instance.IsPickingDisabled(state.active_bone.gameObject)) ||
+            e.alt || Tools.viewToolActive || e.type == EventType.Ignore ||
+            e.type == EventType.MouseLeaveWindow || escape)
         {
             GUIUtility.hotControl = 0;
             ClearActiveBoneSphere(state);
@@ -668,12 +682,13 @@ public static class DisplayChildNamesInScene
             return;
 
         Transform selected_bone = state.active_bone;
+        bool selected_is_capsule = state.active_is_capsule;
         bool is_click = !state.dragged && !e.alt &&
             (e.mousePosition - state.mouse_down_position).sqrMagnitude <= 16f;
         GUIUtility.hotControl = 0;
         ClearActiveBoneSphere(state);
         if (is_click)
-            ScheduleBoneSphereSelection(selected_bone);
+            ScheduleBoneSphereSelection(selected_bone, selected_is_capsule);
         e.Use();
         sceneView.Repaint();
     }
@@ -682,6 +697,7 @@ public static class DisplayChildNamesInScene
     {
         state.active_control_id = 0;
         state.active_bone = null;
+        state.active_is_capsule = false;
         state.dragged = false;
         state.cancel_requested = false;
     }
@@ -935,7 +951,118 @@ public static class DisplayChildNamesInScene
         return IsDepthVisible(camera, start, out _) && IsDepthVisible(camera, end, out _);
     }
 
-    private static void draw_humanoid_capsules(SceneView scene_view, SceneViewState state)
+    private static bool is_bone_click_selection_enabled(bool capsule)
+    {
+        return isEnabled && (capsule
+            ? show_humanoid_capsules && enable_humanoid_capsule_click_selection
+            : show_bone_spheres && enable_bone_sphere_click_selection);
+    }
+
+    private static void handle_humanoid_capsule_input(
+        SceneView scene_view, SceneViewState state, Event current_event, int control_id, bool pointer_in_view)
+    {
+        if (current_event.type != EventType.Layout && current_event.type != EventType.MouseDown)
+            return;
+        bool may_pick = is_bone_click_selection_enabled(true) && state.has_mouse_position &&
+            pointer_in_view && GUIUtility.hotControl == 0 &&
+            !current_event.alt && !Tools.viewToolActive &&
+            !state.labels.Any(label => label.block_rect.Contains(state.mouse_position)) &&
+            !IsPointerOverColumns(state, state.mouse_position);
+        Transform candidate = may_pick
+            ? pick_humanoid_capsule(scene_view.camera, state, state.mouse_position) : null;
+        if (current_event.type == EventType.Layout)
+        {
+            state.candidate_humanoid_capsule = candidate;
+            // Prefer a humanoid capsule over a sphere (0.01) or mesh selection.
+            // A native transform handle directly under the pointer (0) still wins.
+            if (candidate != null)
+                HandleUtility.AddControl(control_id, 0.005f);
+            return;
+        }
+        if (current_event.button != 0 || candidate == null ||
+            candidate != state.candidate_humanoid_capsule || HandleUtility.nearestControl != control_id)
+            return;
+        GUIUtility.hotControl = control_id;
+        state.active_control_id = control_id;
+        state.active_bone = candidate;
+        state.active_is_capsule = true;
+        state.mouse_down_position = current_event.mousePosition;
+        state.dragged = false;
+        current_event.Use();
+        scene_view.Repaint();
+    }
+
+    private static Transform pick_humanoid_capsule(Camera camera, SceneViewState state, Vector2 pointer)
+    {
+        Transform candidate = null;
+        float best_axis_distance = float.PositiveInfinity;
+        float best_depth = float.PositiveInfinity;
+        foreach (HumanoidCapsuleSegment segment in state.humanoid_capsules)
+        {
+            if (!try_get_humanoid_capsule(camera, segment, out Vector3 start, out Vector3 end) ||
+                SceneVisibilityManager.instance.IsPickingDisabled(segment.start.gameObject))
+                continue;
+            float radius = Vector3.Distance(start, end) * humanoid_capsule_thickness;
+            if (!build_humanoid_capsule_outline(camera, start, end, radius))
+                continue;
+            bool valid_projection = true;
+            for (int i = 0; i < humanoid_capsule_points.Length; i++)
+            {
+                Vector3 world = humanoid_capsule_points[i];
+                Vector2 point = HandleUtility.WorldToGUIPoint(world);
+                if (camera.WorldToScreenPoint(world).z < camera.nearClipPlane ||
+                    float.IsNaN(point.x) || float.IsNaN(point.y) ||
+                    float.IsInfinity(point.x) || float.IsInfinity(point.y))
+                {
+                    valid_projection = false;
+                    break;
+                }
+                humanoid_capsule_gui_points[i] = point;
+            }
+            if (!valid_projection || !is_inside_capsule_outline(pointer, humanoid_capsule_gui_points,
+                    humanoid_capsule_pick_padding_pixels))
+                continue;
+            Vector2 gui_start = HandleUtility.WorldToGUIPoint(start);
+            Vector2 gui_end = HandleUtility.WorldToGUIPoint(end);
+            float axis_distance = distance_to_gui_segment(pointer, gui_start, gui_end);
+            float depth = camera.WorldToScreenPoint((start + end) * 0.5f).z;
+            if (axis_distance < best_axis_distance ||
+                (Mathf.Approximately(axis_distance, best_axis_distance) && depth < best_depth))
+            {
+                candidate = segment.start;
+                best_axis_distance = axis_distance;
+                best_depth = depth;
+            }
+        }
+        return candidate;
+    }
+
+    private static float distance_to_gui_segment(Vector2 point, Vector2 start, Vector2 end)
+    {
+        Vector2 axis = end - start;
+        float t = axis.sqrMagnitude > 0f
+            ? Mathf.Clamp01(Vector2.Dot(point - start, axis) / axis.sqrMagnitude) : 0f;
+        return Vector2.Distance(point, start + axis * t);
+    }
+
+    private static bool is_inside_capsule_outline(Vector2 pointer, Vector2[] outline, float padding)
+    {
+        bool inside = false;
+        // The final vertex repeats the first; use the same projected outline as rendering.
+        for (int i = 0; i < outline.Length - 1; i++)
+        {
+            Vector2 a = outline[i];
+            Vector2 b = outline[i + 1];
+            if (distance_to_gui_segment(pointer, a, b) <= padding)
+                return true;
+            if ((a.y > pointer.y) != (b.y > pointer.y) &&
+                pointer.x < (b.x - a.x) * (pointer.y - a.y) / (b.y - a.y) + a.x)
+                inside = !inside;
+        }
+        return inside;
+    }
+
+    private static void draw_humanoid_capsules(SceneView scene_view, SceneViewState state, int control_id)
     {
         if (!show_humanoid_capsules || Event.current.type != EventType.Repaint ||
             scene_view.camera == null || state.humanoid_capsules.Count == 0)
@@ -950,14 +1077,19 @@ public static class DisplayChildNamesInScene
             {
                 if (!try_get_humanoid_capsule(camera, segment, out Vector3 start, out Vector3 end))
                     continue;
-                bool selected = Selection.Contains(segment.start.gameObject) ||
-                    (segment.end != null && Selection.Contains(segment.end.gameObject));
-                Handles.color = selected ? Handles.selectedColor :
+                bool selected = Selection.Contains(segment.start.gameObject);
+                bool hovered = enable_humanoid_capsule_click_selection &&
+                    EditorWindow.mouseOverWindow == scene_view && HandleUtility.nearestControl == control_id &&
+                    state.candidate_humanoid_capsule == segment.start;
+                bool pressed = state.active_is_capsule && state.active_bone == segment.start &&
+                    GUIUtility.hotControl == state.active_control_id;
+                Handles.color = selected || pressed ? Handles.selectedColor : hovered ? Handles.preselectionColor :
                     segment.side == HumanoidBoneSide.Left ? humanoid_capsule_left_color :
                     segment.side == HumanoidBoneSide.Right ? humanoid_capsule_right_color :
                     humanoid_capsule_center_color;
                 float radius = Vector3.Distance(start, end) * humanoid_capsule_thickness;
-                draw_wire_capsule(camera, start, end, radius, selected ? 2.5f : 1.5f);
+                draw_wire_capsule(camera, start, end, radius,
+                    selected || hovered || pressed ? humanoid_capsule_highlight_width : humanoid_capsule_line_width);
             }
         }
         finally
@@ -969,36 +1101,66 @@ public static class DisplayChildNamesInScene
 
     private static void draw_wire_capsule(Camera camera, Vector3 start, Vector3 end, float radius, float width)
     {
+        if (!build_humanoid_capsule_outline(camera, start, end, radius))
+            return;
+        // A dark border separates the opaque outline from bright avatar materials.
+        Color capsule_color = Handles.color;
+        Handles.color = new Color(0.03f, 0.04f, 0.06f, 0.8f);
+        Handles.DrawAAPolyLine(width + 2f, humanoid_capsule_points);
+        capsule_color.a = 1f;
+        Handles.color = capsule_color;
+        Handles.DrawAAPolyLine(width, humanoid_capsule_points);
+        Vector3 direction = (end - start).normalized;
+        // Rings at both joints give the outline its depth/orientation.
+        Handles.DrawWireDisc(start, direction, radius);
+        Handles.DrawWireDisc(end, direction, radius);
+    }
+
+    private static bool build_humanoid_capsule_outline(Camera camera, Vector3 start, Vector3 end, float radius)
+    {
         Vector3 axis = end - start;
         float length = axis.magnitude;
-        if (length <= 0f || radius <= 0f || float.IsNaN(radius) || float.IsInfinity(radius))
-            return;
+        if (length <= 0f || float.IsNaN(length) || float.IsInfinity(length) ||
+            radius <= 0f || float.IsNaN(radius) || float.IsInfinity(radius))
+            return false;
         Vector3 direction = axis / length;
         Vector3 center = (start + end) * 0.5f;
         Vector3 view = camera.orthographic ? -camera.transform.forward : camera.transform.position - center;
         // Outline the capsule as seen from the camera: side lines + both hemispheres.
         Vector3 side = Vector3.Cross(direction, view);
         if (side.sqrMagnitude < 0.00000001f)
-            side = Vector3.Cross(direction, Mathf.Abs(direction.y) < 0.99f ? Vector3.up : Vector3.right);
+        {
+            // Seen end-on, the visible capsule is a disc, not a collapsed line.
+            Vector3 near_end = camera.WorldToScreenPoint(start).z <= camera.WorldToScreenPoint(end).z ? start : end;
+            Vector3 normal = view.normalized;
+            side = Vector3.Cross(normal, Mathf.Abs(normal.y) < 0.99f ? Vector3.up : Vector3.right).normalized;
+            Vector3 up = Vector3.Cross(normal, side).normalized;
+            int count = humanoid_capsule_points.Length - 1;
+            for (int i = 0; i < count; i++)
+            {
+                float angle = Mathf.PI * 2f * i / count;
+                humanoid_capsule_points[i] = near_end + (side * Mathf.Cos(angle) + up * Mathf.Sin(angle)) * radius;
+            }
+            humanoid_capsule_points[count] = humanoid_capsule_points[0];
+            return true;
+        }
         side.Normalize();
+        Vector3 cap_direction = Vector3.Cross(view.normalized, side).normalized;
 
         int n = humanoid_capsule_arc_segments;
         int index = 0;
         for (int i = 0; i <= n; i++)
         {
             float angle = Mathf.PI * i / n;
-            humanoid_capsule_points[index++] = end + (side * Mathf.Cos(angle) + direction * Mathf.Sin(angle)) * radius;
+            humanoid_capsule_points[index++] = end + (side * Mathf.Cos(angle) + cap_direction * Mathf.Sin(angle)) * radius;
         }
         for (int i = 0; i <= n; i++)
         {
             float angle = Mathf.PI * i / n;
-            humanoid_capsule_points[index++] = start + (-side * Mathf.Cos(angle) - direction * Mathf.Sin(angle)) * radius;
+            humanoid_capsule_points[index++] = start + (-side * Mathf.Cos(angle) - cap_direction * Mathf.Sin(angle)) * radius;
         }
         humanoid_capsule_points[index] = humanoid_capsule_points[0];
-        Handles.DrawAAPolyLine(width, humanoid_capsule_points);
-        // Rings at both joints give the outline its depth/orientation.
-        Handles.DrawWireDisc(start, direction, radius);
-        Handles.DrawWireDisc(end, direction, radius);
+        return true;
     }
 
     private static void DrawBoneSpheres(SceneView sceneView, SceneViewState state, int control_id)
@@ -1107,6 +1269,7 @@ public static class DisplayChildNamesInScene
             GUIUtility.hotControl = control_id;
             state.active_control_id = control_id;
             state.active_bone = state.candidate_bone;
+            state.active_is_capsule = false;
             state.mouse_down_position = e.mousePosition;
             state.dragged = false;
             e.Use();
@@ -1142,7 +1305,7 @@ public static class DisplayChildNamesInScene
 
     }
 
-    private static void ScheduleBoneSphereSelection(Transform bone)
+    private static void ScheduleBoneSphereSelection(Transform bone, bool capsule)
     {
         if (bone == null)
         {
@@ -1150,6 +1313,7 @@ public static class DisplayChildNamesInScene
         }
 
         pending_delayed_bone_sphere_selection = bone;
+        pending_selection_is_capsule = capsule;
         EditorApplication.delayCall -= ApplyDelayedBoneSphereSelection;
         EditorApplication.delayCall += ApplyDelayedBoneSphereSelection;
     }
@@ -1158,7 +1322,8 @@ public static class DisplayChildNamesInScene
     {
         Transform bone = pending_delayed_bone_sphere_selection;
         pending_delayed_bone_sphere_selection = null;
-        if (bone == null || !isEnabled || !show_bone_spheres || !enable_bone_sphere_click_selection)
+        if (!is_visible_transform(bone) || !is_bone_click_selection_enabled(pending_selection_is_capsule) ||
+            (pending_selection_is_capsule && SceneVisibilityManager.instance.IsPickingDisabled(bone.gameObject)))
             return;
         SelectGameObject(bone.gameObject);
         SceneView.RepaintAll();
@@ -1295,7 +1460,7 @@ public static class DisplayChildNamesInScene
             foreach (SceneViewState state in scene_view_states.Values)
             {
                 state.column_content_dirty = true;
-                if (!show_bone_spheres || !enable_bone_sphere_click_selection)
+                if (!is_bone_click_selection_enabled(state.active_is_capsule))
                     state.cancel_requested = true;
             }
             SaveSessionState();
@@ -1320,6 +1485,9 @@ public static class DisplayChildNamesInScene
             "Humanoid設定のAnimatorについて、Avatarに割り当てられたボーンをカプセルで表示します。左は青、右は赤、中心は黄色です。");
         using (new EditorGUI.DisabledScope(!show_humanoid_capsules))
         {
+            enable_humanoid_capsule_click_selection = CompactSettingsToggle("カプセルをクリック選択",
+                enable_humanoid_capsule_click_selection,
+                "カプセルの輪郭・内側をクリックして始点側のボーンを選択します（上腕〜肘なら上腕）。\nメッシュ・スフィアより優先します。視点操作・移動ギズモ・ラベル操作はそのまま使えます。");
             humanoid_capsule_thickness = CompactSettingsSlider("カプセル太さ", humanoid_capsule_thickness,
                 min_humanoid_capsule_thickness, max_humanoid_capsule_thickness,
                 "カプセルの半径をボーンの長さに対する比率で指定します。");
@@ -2462,6 +2630,7 @@ public static class DisplayChildNamesInScene
         show_bone_spheres = true;
         show_bone_hierarchy = true;
         show_humanoid_capsules = false;
+        enable_humanoid_capsule_click_selection = true;
         humanoid_capsule_thickness = default_humanoid_capsule_thickness;
         show_bone_spheres_near_cursor_only = true;
         enable_bone_sphere_click_selection = false;
@@ -2497,6 +2666,7 @@ public static class DisplayChildNamesInScene
         show_bone_spheres = SessionState.GetBool(session_key_show_bone_spheres, true);
         show_bone_hierarchy = SessionState.GetBool(session_key_show_bone_hierarchy, true);
         show_humanoid_capsules = SessionState.GetBool(session_key_show_humanoid_capsules, false);
+        enable_humanoid_capsule_click_selection = SessionState.GetBool(session_key_enable_humanoid_capsule_click_selection, true);
         humanoid_capsule_thickness = Mathf.Clamp(SessionState.GetFloat(session_key_humanoid_capsule_thickness,
             default_humanoid_capsule_thickness), min_humanoid_capsule_thickness, max_humanoid_capsule_thickness);
         show_bone_spheres_near_cursor_only = SessionState.GetBool(session_key_show_bone_spheres_near_cursor_only, true);
@@ -2534,6 +2704,7 @@ public static class DisplayChildNamesInScene
         SessionState.SetBool(session_key_show_bone_spheres, show_bone_spheres);
         SessionState.SetBool(session_key_show_bone_hierarchy, show_bone_hierarchy);
         SessionState.SetBool(session_key_show_humanoid_capsules, show_humanoid_capsules);
+        SessionState.SetBool(session_key_enable_humanoid_capsule_click_selection, enable_humanoid_capsule_click_selection);
         SessionState.SetFloat(session_key_humanoid_capsule_thickness, Mathf.Clamp(humanoid_capsule_thickness,
             min_humanoid_capsule_thickness, max_humanoid_capsule_thickness));
         SessionState.SetBool(session_key_show_bone_spheres_near_cursor_only, show_bone_spheres_near_cursor_only);
